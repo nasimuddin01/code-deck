@@ -1,0 +1,13 @@
+BouncyCastle.Crypto.dll
+code.ini
+DriverinStallationGuide.txt
+Microsoft.Win32.TaskScheduler.dll
+msvcp140_1d.dll
+msvcr110d.dll
+msvcr120d.dll
+NAudio.dll
+NET_download.txt
+Newtonsoft.Json.dll
+Troubleshooting.txt
+UsbMonitor.exe
+logs\20260917_log.txt

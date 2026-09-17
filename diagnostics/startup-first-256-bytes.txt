@@ -1,0 +1,28 @@
+Packet 53, t=15.646108 s, URB payload=6 bytes
+  0000  00 00 00 00 00 ff
+Packet 55, t=15.663706 s, URB payload=6 bytes
+  0006  00 00 00 00 00 6e
+Packet 57, t=15.664201 s, URB payload=6 bytes
+  000c  00 00 00 00 00 6d
+Packet 59, t=15.786075 s, URB payload=16 bytes
+  0012  00 00 00 00 00 7a 00 00 00 00 00 00 00 00 00 00
+Packet 61, t=15.800913 s, URB payload=16 bytes
+  0022  00 00 00 00 00 79 64 01 40 01 e0 00 00 00 00 00
+Packet 63, t=16.327983 s, URB payload=6 bytes
+  0032  09 c0 00 00 00 6e
+Packet 65, t=16.328993 s, URB payload=6 bytes
+  0038  00 00 04 fd df c5
+Packet 67, t=16.329194 s, URB payload=307200 bytes
+  003e  b1 2a 90 22 90 22 90 22 f1 42 51 53 31 4b 31 4b
+  004e  31 4b 31 4b 31 4b 31 4b 31 4b 31 4b 31 4b 31 4b
+  005e  31 4b 31 4b 31 4b 51 4b 31 4b 10 4b b2 5b 17 95
+  006e  57 95 d6 84 d6 84 b5 7c b5 7c 95 7c 75 74 54 74
+  007e  54 74 54 74 33 6c b2 5b 71 53 71 53 71 53 71 53
+  008e  71 53 71 53 71 53 71 53 71 53 71 53 71 53 51 53
+  009e  52 4b 52 4b 31 4b 32 4b 31 4b d3 5b b3 5b 31 53
+  00ae  52 53 52 53 52 53 73 53 b3 5b d3 5b 55 74 79 a5
+  00be  5b c6 99 9d 35 6c 93 53 b4 53 f4 5b f4 5b f4 5b
+  00ce  f5 5b 15 64 76 6c b7 74 d7 7c f7 7c 18 7d 58 85
+  00de  99 8d fa 9d 98 95 16 85 98 95 1a ae d9 a5 f9 a5
+  00ee  5a ae 5a ae 1a ae fa a5 fa a5 fa a5 f9 ad 3a b6
+  00fe  5b be

@@ -1,0 +1,25 @@
+# vendor Windows software — proprietary, never commit
+turzx-win/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+
+# node (phase 3+)
+node_modules/
+web/dist/
+server/src/code_deck/static/*
+!server/src/code_deck/static/.gitkeep
+
+# generated at runtime
+preview*.png
+*_sent.png
+*.log
+*.npy
+
+# os
+.DS_Store
