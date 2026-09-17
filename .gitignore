@@ -26,3 +26,6 @@ preview*.png
 
 # typescript build cache
 *.tsbuildinfo
+
+# menu bar app build output
+menubar/dist/

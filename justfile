@@ -31,3 +31,10 @@ install-local: wheel
 # run in the foreground from the dev checkout
 serve *ARGS:
     cd server && uv run code-deck serve {{ARGS}}
+
+# macOS menu bar app (swiftc; Command Line Tools are enough)
+menubar:
+    ./menubar/build.sh
+
+menubar-install:
+    ./menubar/build.sh --install
