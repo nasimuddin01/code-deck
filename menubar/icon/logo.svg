@@ -26,7 +26,7 @@
     <filter id="glow" filterUnits="userSpaceOnUse" x="300" y="260" width="424" height="500">
       <feGaussianBlur stdDeviation="22"/>
     </filter>
-    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+    <filter id="shadow" filterUnits="userSpaceOnUse" x="250" y="180" width="524" height="680">
       <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity="0.45"/>
     </filter>
   </defs>
