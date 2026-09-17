@@ -358,9 +358,11 @@ final class StatusController: NSResponder, NSMenuDelegate {
         let s = summary
         let title = NSMutableAttributedString()
         let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        // same rule as the screen: any session waiting on you (permission,
+        // question, or a finished turn) shows the attention blue
         if s.needsYou || s.turnEnded {
             title.append(NSAttributedString(string: "● ", attributes: [
-                .foregroundColor: s.needsYou ? attention : muted, .font: font, .baselineOffset: 0]))
+                .foregroundColor: attention, .font: font, .baselineOffset: 0]))
         }
         if readoutEnabled && s.ok {
             var parts = [String(format: "$%.0f", s.costUSD)]
