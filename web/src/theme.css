@@ -49,6 +49,9 @@ body {
 .screen .panel { position: absolute; inset: 0; background: var(--panel); border-radius: 8px; }
 .screen svg { position: absolute; display: block; }
 
+/* player page: the document IS the screen — never scrollable, no margins */
+html:has(body.player), body.player { overflow: hidden; margin: 0; }
+
 /* device mode: nothing that could bleed into a frame */
 .device, .device * { cursor: none !important; user-select: none !important; }
 .device { overflow: hidden; }

@@ -18,11 +18,14 @@ export function WidgetHost({ item }: { item: LayoutItem }) {
   );
 }
 
-/** The 320x480 screen. `device` = what headless Chromium screenshots. */
-export function Screen({ device = false }: { device?: boolean }) {
+/** The 320x480 screen. `device` = what headless Chromium screenshots.
+ * `scale` renders it enlarged with a CSS transform — for embedding hosts
+ * (the menu bar popover) so they never have to zoom the page themselves. */
+export function Screen({ device = false, scale = 1 }: { device?: boolean; scale?: number }) {
   const layout = useLayoutStore((s) => s.layout);
+  const style = scale !== 1 ? { transform: `scale(${scale})`, transformOrigin: "top left" } : undefined;
   return (
-    <div className={`screen${device ? " device" : ""}`} id="screen">
+    <div className={`screen${device ? " device" : ""}`} id="screen" style={style}>
       {layout?.items.map((it) => <WidgetHost key={it.id} item={it} />)}
     </div>
   );
@@ -31,6 +34,7 @@ export function Screen({ device = false }: { device?: boolean }) {
 export function Player({ device }: { device: boolean }) {
   const haveLayout = useLayoutStore((s) => s.layout !== null);
   const haveSnapshot = useLive((s) => s.snapshot !== null);
+  const scale = Math.max(0.5, Math.min(4, Number(new URLSearchParams(location.search).get("scale")) || 1));
 
   // ready = fonts loaded + first snapshot + layout + two painted frames; the
   // frame pipeline waits for this before its first screenshot
@@ -49,8 +53,12 @@ export function Player({ device }: { device: boolean }) {
 
   useEffect(() => {
     if (device) document.body.classList.add("device");
+    // the page is exactly the (scaled) screen: no margins, nothing scrollable
+    document.body.classList.add("player");
     document.body.style.background = "var(--surface)";
-  }, [device]);
+    document.body.style.width = `${320 * scale}px`;
+    document.body.style.height = `${480 * scale}px`;
+  }, [device, scale]);
 
-  return <Screen device={device} />;
+  return <Screen device={device} scale={scale} />;
 }

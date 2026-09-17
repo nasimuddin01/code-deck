@@ -59,7 +59,9 @@ struct Summary {
 final class PlayerViewController: NSViewController, WKNavigationDelegate {
     let webView: WKWebView
     let offline = NSTextField(labelWithString: "CODE DECK server is offline\nstart it with `code-deck service install`")
-    var zoom: CGFloat = 1.0 { didSet { apply() } }
+    // scaling is done by the page (/player?scale=N), never by zooming the web
+    // view: a zoomed page can scroll sideways by a pixel and stay offset
+    var zoom: CGFloat = 1.0 { didSet { if zoom != oldValue { apply(); load() } } }
     private var retry: Timer?
 
     init() {
@@ -90,23 +92,31 @@ final class PlayerViewController: NSViewController, WKNavigationDelegate {
         load()
     }
 
+    var size: NSSize { NSSize(width: 320 * zoom, height: 480 * zoom) }
+
     func apply() {
-        let size = NSSize(width: 320 * zoom, height: 480 * zoom)
         preferredContentSize = size
         view.frame = NSRect(origin: .zero, size: size)
         webView.frame = view.bounds
         offline.frame = NSRect(x: 16, y: size.height / 2 - 24, width: size.width - 32, height: 48)
-        if #available(macOS 11.0, *) { webView.pageZoom = zoom }
     }
 
     func load() {
-        webView.load(URLRequest(url: serverURL.appendingPathComponent("player"), cachePolicy: .reloadIgnoringLocalCacheData))
+        var c = URLComponents(url: serverURL.appendingPathComponent("player"), resolvingAgainstBaseURL: false)!
+        c.queryItems = [URLQueryItem(name: "scale", value: String(format: "%g", Double(zoom)))]
+        webView.load(URLRequest(url: c.url!, cachePolicy: .reloadIgnoringLocalCacheData))
+    }
+
+    /// Belt and braces on every show: whatever happened, the page sits at 0,0.
+    func resetScroll() {
+        webView.evaluateJavaScript("window.scrollTo(0,0)", completionHandler: nil)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         offline.isHidden = true
         webView.isHidden = false
         retry?.invalidate(); retry = nil
+        resetScroll()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { failed() }
@@ -270,7 +280,9 @@ final class StatusController: NSResponder, NSMenuDelegate {
         guard let button = item.button else { return }
         pinned = pin || pinned
         if !popover.isShown {
-            player.zoom = zoom
+            player.zoom = zoom                 // no-op unless the size setting changed
+            popover.contentSize = player.size
+            player.resetScroll()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
                 self?.close()   // click anywhere outside the app closes it
