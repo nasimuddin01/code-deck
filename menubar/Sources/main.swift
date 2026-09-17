@@ -159,6 +159,9 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     static let shared = Notifier()
     private(set) var authorized = false
     private(set) var status = "not requested"
+    /// "banners · in Notification Center" style summary for the menu
+    private(set) var detail = ""
+    private var sigusr1: DispatchSourceSignal?
 
     func setup() {
         let c = UNUserNotificationCenter.current()
@@ -171,16 +174,34 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             }
         }
         refreshStatus()
+        // `kill -USR1 <pid>`: post a test notification and dump the settings +
+        // delivered list to the log — lets `doctor`/a terminal probe delivery
+        // without clicking through the menu.
+        signal(SIGUSR1, SIG_IGN)
+        let src = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
+        src.setEventHandler { [weak self] in
+            log("notifications: SIGUSR1 -> test")
+            self?.refreshStatus()
+            self?.post(title: "Turn ended · code-deck", body: "Test notification (SIGUSR1).",
+                       id: "codedeck-test-\(Int(Date().timeIntervalSince1970))", sound: true)
+        }
+        src.resume()
+        sigusr1 = src
     }
 
     func refreshStatus() {
         UNUserNotificationCenter.current().getNotificationSettings { s in
             let names = ["not determined", "denied", "authorized", "provisional", "ephemeral"]
             let name = names.indices.contains(s.authorizationStatus.rawValue) ? names[s.authorizationStatus.rawValue] : "\(s.authorizationStatus.rawValue)"
+            let onoff = { (v: UNNotificationSetting) -> String in v == .enabled ? "on" : v == .disabled ? "off" : "n/a" }
+            let style = ["none", "banner", "alert"]
+            let styleName = style.indices.contains(s.alertStyle.rawValue) ? style[s.alertStyle.rawValue] : "\(s.alertStyle.rawValue)"
+            let detail = "style \(styleName) · alerts \(onoff(s.alertSetting)) · center \(onoff(s.notificationCenterSetting)) · lock screen \(onoff(s.lockScreenSetting)) · sound \(onoff(s.soundSetting))"
             DispatchQueue.main.async {
                 self.authorized = s.authorizationStatus == .authorized
                 self.status = name
-                log("notifications: status=\(name) alerts=\(s.alertSetting.rawValue) sound=\(s.soundSetting.rawValue)")
+                self.detail = detail
+                log("notifications: status=\(name) \(detail)")
             }
         }
     }
@@ -191,10 +212,18 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         content.body = body
         content.threadIdentifier = "codedeck"
         if sound { content.sound = .default }
-        UNUserNotificationCenter.current().add(
-            UNNotificationRequest(identifier: id, content: content, trigger: nil)) { err in
-                log("notifications: post '\(title)' error=\(err.map { String(describing: $0) } ?? "none")")
+        let center = UNUserNotificationCenter.current()
+        center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil)) { err in
+            log("notifications: post '\(title)' error=\(err.map { String(describing: $0) } ?? "none")")
+            // Did it land in Notification Center? A Focus silences banners but
+            // still delivers to the list; a dropped one shows up nowhere.
+            DispatchQueue.global().asyncAfter(deadline: .now() + 1.5) {
+                center.getDeliveredNotifications { delivered in
+                    let ours = delivered.filter { $0.request.identifier == id }
+                    log("notifications: delivered '\(title)' inCenter=\(!ours.isEmpty) totalListed=\(delivered.count)")
+                }
             }
+        }
     }
 
     // show banners even though we're the frontmost (accessory) app
@@ -334,6 +363,9 @@ final class StatusController: NSResponder, NSMenuDelegate {
         guard s.ok else { return }
         let now = Set(s.attention.map(\.key))
         defer { seenAttention = now }
+        if now != seenAttention {
+            log("attention: \(seenAttention == nil ? "seed" : "change") -> [\(now.sorted().joined(separator: ", "))]")
+        }
         guard let seen = seenAttention else { return }
         for a in s.attention where !seen.contains(a.key) {
             let isIdle = a.kind == "idle"
@@ -493,7 +525,14 @@ final class StatusController: NSResponder, NSMenuDelegate {
         nsub.addItem(.separator())
         let st = nsub.addItem(withTitle: "Status: \(Notifier.shared.status)", action: nil, keyEquivalent: "")
         st.isEnabled = false
+        if !Notifier.shared.detail.isEmpty {
+            let dt = nsub.addItem(withTitle: Notifier.shared.detail, action: nil, keyEquivalent: "")
+            dt.isEnabled = false
+        }
+        let hint = nsub.addItem(withTitle: "Not seeing them? A Focus mode silences apps it doesn't allow", action: nil, keyEquivalent: "")
+        hint.isEnabled = false
         nsub.addItem(withTitle: "Open Notification Settings…", action: #selector(openNotifSettings), keyEquivalent: "").target = self
+        nsub.addItem(withTitle: "Open Focus Settings…", action: #selector(openFocusSettings), keyEquivalent: "").target = self
         nsub.addItem(withTitle: "Send a test notification", action: #selector(testNotification), keyEquivalent: "").target = self
         Notifier.shared.refreshStatus()
         notif.submenu = nsub
@@ -520,6 +559,9 @@ final class StatusController: NSResponder, NSMenuDelegate {
     }
     @objc private func openNotifSettings() {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(Bundle.main.bundleIdentifier ?? "")")!)
+    }
+    @objc private func openFocusSettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Focus-Settings.extension")!)
     }
     @objc private func testNotification() {
         Notifier.shared.post(title: "Turn ended · code-deck", body: "This is what a session notification looks like.",

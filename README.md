@@ -150,6 +150,7 @@ Ship a build into the installed service:
 | `$` shows `est` | paste `code-deck env print` into settings.json; only sessions started afterwards export cost |
 | no needs-you / turn-ended | paste `code-deck hooks print`; `doctor` flags a stale hook path |
 | service not running | `code-deck service logs` |
+| menu bar app posts notifications but none appear | a **Focus** mode (Do Not Disturb, Work, …) silences apps it doesn't list: System Settings → Focus → the active mode → Allowed Apps → add CODE DECK. Silenced ones still land in Notification Center (click the clock). `~/Library/Logs/code-deck/menubar.log` shows each post and whether it reached the list; `kill -USR1 $(pgrep CodeDeckMenuBar)` fires a test one |
 
 ## License
 
