@@ -4,22 +4,30 @@ A desk dashboard for a **TURZX 3.5" USB smart screen** (320x480 portrait) that s
 live **Claude Code**, **Claude Max** and **Codex** usage: spend, weekly quota, active
 sessions, and a "needs you" alert when an agent is waiting on you.
 
-> Status: v2 in progress — the renderer is being moved to a React layout builder
-> with a 1:1 device preview. What ships today is the packaged v1 renderer as a
-> background service.
+> Status: v2 in progress. The screen is rendered by a React app (`/player`)
+> screenshotted with headless Chromium and pushed over USB as dirty
+> rectangles; the drag-and-drop layout builder lands next.
 
 ## Install (macOS)
 
 ```
 brew install libusb
 pipx install ./server        # or the wheel from server/dist once released
+code-deck setup              # one-time: headless Chromium for the renderer
 code-deck doctor             # libusb, device, hooks, telemetry, service
 code-deck service install    # launchd agent: starts at login, restarts on crash
 ```
 
-`code-deck serve` runs it in the foreground instead. Logs live in
-`~/Library/Logs/code-deck/`; the last frame is mirrored to
-`~/.config/code-deck/preview.png`.
+`code-deck serve` runs it in the foreground instead (`--renderer pil` = the v1
+PIL renderer, kept as a fallback). Logs live in `~/Library/Logs/code-deck/`;
+the last frame is mirrored to `~/.config/code-deck/preview.png`. The live
+preview page is `http://127.0.0.1:8765/` and the raw player `…/player`.
+
+How it draws: the React player marks itself dirty on every change (data,
+clock, layout); the Python side polls that counter, screenshots only then,
+diffs against the previous frame and pushes just the changed rectangle. A
+ticking seconds digit is a 5x7 px push (~8 ms); a full frame is ~1.9 s, which
+is the panel's transport limit.
 
 Claude Code integration — both blocks are printed for **you** to paste into
 `~/.claude/settings.json`; this tool never writes that file:
@@ -59,8 +67,13 @@ see `docs/protocol/turzx_protocol_report.md`.
 
 ```
 cd server && uv sync --group dev && uv run pytest
+cd web && pnpm install && pnpm test && pnpm build:server   # builds into server/src/code_deck/static
 uv run code-deck serve --no-device      # renders to the preview file only
+uv run code-deck render out.png --mock  # one frame, no device (CI golden)
 ```
+
+Hot reload on the device: `pnpm dev` in `web/`, then
+`code-deck serve --player-url http://127.0.0.1:5173/player?device=1`.
 
 ## License
 

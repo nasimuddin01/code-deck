@@ -19,6 +19,7 @@ dependencies = [
   "uvicorn[standard]>=0.35,<1",
   "pydantic>=2.10,<3",
   "psutil>=6,<8",
+  "playwright>=1.55,<2",
 ]
 
 [project.scripts]
@@ -28,15 +29,14 @@ code-deck-hook = "code_deck.hooks.attention:run"
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.13", "httpx>=0.27"]
 
+[tool.hatch.build]
+# the built web app is gitignored; declare it an artifact so BOTH the sdist and
+# the wheel carry it (uv builds the wheel from the sdist, so excluding it from
+# the sdist silently drops it from the wheel too)
+artifacts = ["src/code_deck/static/**"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/code_deck"]
-artifacts = [
-  "src/code_deck/static/**",
-  "src/code_deck/layouts/*.json",
-]
-
-[tool.hatch.build.targets.sdist]
-exclude = ["src/code_deck/static/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

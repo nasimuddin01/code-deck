@@ -22,6 +22,9 @@ CLAUDE_SETTINGS = CLAUDE_DIR / "settings.json"
 CODEX_APPSERVER_BIN = Path("~/.codex/plugins/.plugin-appserver/codex").expanduser()
 
 DEFAULT_PORT = int(os.environ.get("CODE_DECK_PORT", "8765"))
+# chromium renders the React player (what the builder edits); pil is the v1
+# renderer kept as a fallback for one release
+DEFAULT_RENDERER = os.environ.get("CODE_DECK_RENDERER", "chromium")
 OTLP_PORT = 4318
 DEFAULT_BRIGHTNESS = 39       # raw device param (0-255), not percent
 DEFAULT_INTERVAL = 10         # seconds between stats polls / PIL frames

@@ -10,8 +10,16 @@ test:
 lint:
     cd server && uv sync --group dev -q && uv run ruff check src tests
 
-# build the wheel into server/dist
-wheel:
+# build the web app into the python package (server/src/code_deck/static)
+web-build:
+    cd web && pnpm install --silent && pnpm build:server
+
+# web tests + typecheck
+web-test:
+    cd web && pnpm install --silent && pnpm typecheck && pnpm test
+
+# build the wheel (with the web app inside) into server/dist
+wheel: web-build
     cd server && rm -rf dist && uv build -q
 
 # build + (re)install into pipx, then restart the service if installed

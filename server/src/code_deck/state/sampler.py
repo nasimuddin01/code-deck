@@ -22,16 +22,19 @@ log = logging.getLogger(__name__)
 
 class StatsSampler(threading.Thread):
     def __init__(self, store: StateStore, tracker: AttentionTracker, interval: float,
-                 stop: threading.Event) -> None:
+                 stop: threading.Event, mock: bool = False) -> None:
         super().__init__(name="stats-sampler", daemon=True)
         self.store = store
         self.tracker = tracker
         self.interval = interval
         self.stop_event = stop
-        self.live = LiveStatsProvider()
+        # mock: dummy numbers only (golden renders, CI, machines without Claude/Codex)
+        self.live = None if mock else LiveStatsProvider()
         self.fallback = DummyStatsProvider()
 
     def _stats(self):
+        if self.live is None:
+            return self.fallback.get_stats()
         try:
             return self.live.get_stats()
         except Exception as e:  # never let a parse hiccup blank the screen

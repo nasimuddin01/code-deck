@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import json
-import shutil
 import socket
 import sys
+import time
 from pathlib import Path
 
 import typer
@@ -46,7 +46,7 @@ def _read_settings() -> dict | None:
 
 @app.command()
 def serve(
-    renderer: str = typer.Option("pil", help="pil (current) | none (API only) | chromium (coming)"),
+    renderer: str = typer.Option(config.DEFAULT_RENDERER, help="chromium | pil (legacy) | none (API only)"),
     host: str = typer.Option("127.0.0.1", help="0.0.0.0 to expose the builder on the LAN"),
     port: int = typer.Option(config.DEFAULT_PORT),
     interval: float | None = typer.Option(None, help="seconds between polls (default: layout setting)"),
@@ -55,6 +55,9 @@ def serve(
     overlay: bool | None = typer.Option(None, help="full-screen banner when a session needs you"),
     overlay_seconds: float | None = typer.Option(None),
     no_device: bool = typer.Option(False, help="render to the preview file only"),
+    mock: bool = typer.Option(False, help="dummy data instead of Claude/Codex files"),
+    player_url: str | None = typer.Option(None, help="render this URL instead of the bundled player "
+                                                     "(e.g. the Vite dev server)"),
     verbose: bool = typer.Option(False, "-v", "--verbose"),
 ) -> None:
     """Run the server + dashboard (foreground). `service install` runs this for you."""
@@ -63,8 +66,9 @@ def serve(
     from .runtime import Runtime
     setup(verbose)
     try:
-        rt = Runtime(renderer=renderer, interval=interval, brightness=brightness,
-                     overlay=overlay, overlay_seconds=overlay_seconds, no_device=no_device)
+        rt = Runtime(renderer=renderer, host=host, port=port, interval=interval,
+                     brightness=brightness, overlay=overlay, overlay_seconds=overlay_seconds,
+                     no_device=no_device, mock=mock, player_url=player_url)
     except ValueError as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(2)
@@ -73,6 +77,61 @@ def serve(
     try:
         uvicorn.run(rt.app, host=host, port=port, log_config=None, access_log=False)
     finally:
+        rt.shutdown()
+
+
+@app.command()
+def setup() -> None:
+    """One-time: install the headless Chromium the renderer uses."""
+    import subprocess
+    from .turzx import libusb
+    cmd = [sys.executable, "-m", "playwright", "install", "chromium"]
+    if sys.platform.startswith("linux"):
+        cmd.append("--with-deps")
+    typer.echo(f"{INFO} {' '.join(cmd)}")
+    r = subprocess.run(cmd)
+    if r.returncode != 0:
+        raise typer.Exit(r.returncode)
+    typer.echo(f"{OK} chromium installed")
+    path = libusb.find_libusb()
+    typer.echo(f"{OK if path else BAD} libusb: {path or f'not found ({libusb.INSTALL_HINT})'}")
+
+
+@app.command()
+def render(
+    out: Path = typer.Argument(Path("frame.png"), help="PNG to write"),
+    mock: bool = typer.Option(False, help="dummy data (deterministic-ish, no Claude/Codex files)"),
+    player_url: str | None = typer.Option(None),
+    timeout: float = typer.Option(30.0),
+) -> None:
+    """Render one frame with the Chromium renderer, no device needed (CI golden)."""
+    from .log import setup as log_setup
+    from .render.chromium import ChromiumRenderer
+    from .runtime import Runtime, free_port
+    log_setup(False)
+    port = free_port()
+    try:
+        rt = Runtime(renderer="none", port=port, mock=mock)
+    except ValueError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(2)
+    rt.start()
+    server = rt.serve_in_thread()
+    r = ChromiumRenderer(player_url or f"http://127.0.0.1:{port}/player?device=1")
+    try:
+        r.start()
+        deadline = time.time() + timeout
+        frame = None
+        while frame is None and time.time() < deadline:
+            frame = r.poll(timeout=1.0)
+        if frame is None:
+            typer.echo("no frame produced", err=True)
+            raise typer.Exit(1)
+        frame.save(out)
+        typer.echo(f"{OK} wrote {out} ({frame.width}x{frame.height})")
+    finally:
+        r.stop()
+        server.should_exit = True
         rt.shutdown()
 
 
@@ -212,7 +271,18 @@ def doctor() -> None:
         else:
             line(INFO, "service: not installed (`code-deck service install`)")
 
-    line(INFO, "chromium renderer: not part of this release yet")
+    from .server.app import static_dir
+    line(OK if static_dir() else WARN,
+         "web app: " + ("bundled" if static_dir() else "not built (builder/player unavailable; "
+                                                        "pil renderer only)"))
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            exe = Path(p.chromium.executable_path)
+        line(OK if exe.exists() else WARN,
+             "headless chromium: " + ("installed" if exe.exists() else "missing (`code-deck setup`)"))
+    except Exception as e:
+        line(WARN, f"headless chromium: unavailable ({e})")
     raise typer.Exit(1 if problems else 0)
 
 

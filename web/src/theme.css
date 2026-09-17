@@ -1,0 +1,55 @@
+/* Palette — identical to the v1 PIL renderer (render/pil_legacy.py). */
+:root {
+  --surface: #1a1a19;
+  --panel: #242422;
+  --track: #3a3a37;
+  --divider: #2c2c2a;
+  --text: #ffffff;
+  --text-2: #c3c2b7;
+  --text-muted: #84837a;
+  --blue: #3987e5;      /* Codex */
+  --orange: #d95926;    /* Claude Code (Vertex) */
+  --violet: #9a6ff0;    /* Claude Max */
+  --warning: #fab219;
+  --good: #0ca30c;
+  --critical: #e5484d;
+  --attention: #4aa3ff; /* "needs you" */
+
+  --font-sans: "Inter Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+}
+
+html, body, #root { margin: 0; padding: 0; }
+body {
+  background: #0d0d0c;
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 1;
+}
+* { box-sizing: border-box; }
+
+/* The 320x480 screen. Text is positioned like the PIL renderer: absolute,
+   line-height 1, so `top` ≈ the glyph ascender line. */
+.screen {
+  position: relative;
+  width: 320px;
+  height: 480px;
+  overflow: hidden;
+  background: var(--surface);
+  font-family: var(--font-sans);
+  line-height: 1;
+}
+.screen .w { position: absolute; overflow: hidden; }
+.screen .t { position: absolute; white-space: nowrap; }
+.screen .ell { overflow: hidden; text-overflow: ellipsis; }
+.screen .mono { font-family: var(--font-mono); }
+.screen .r { text-align: right; }
+.screen .dot { position: absolute; border-radius: 50%; }
+.screen .panel { position: absolute; inset: 0; background: var(--panel); border-radius: 8px; }
+.screen svg { position: absolute; display: block; }
+
+/* device mode: nothing that could bleed into a frame */
+.device, .device * { cursor: none !important; user-select: none !important; }
+.device { overflow: hidden; }
+.device ::-webkit-scrollbar { display: none; }
