@@ -8,6 +8,7 @@
 
 import Carbon.HIToolbox
 import Cocoa
+import UserNotifications
 import WebKit
 
 let serverURL = URL(string: ProcessInfo.processInfo.environment["CODE_DECK_URL"] ?? "http://127.0.0.1:8765")!
@@ -17,6 +18,14 @@ let muted = NSColor.secondaryLabelColor
 
 // MARK: - State summary pulled from /api/state
 
+struct Attention: Hashable {
+    let sessionID: String
+    let label: String
+    let model: String
+    let kind: String   // "needs" (permission / question) or "idle" (turn ended)
+    var key: String { "\(sessionID):\(kind)" }
+}
+
 struct Summary {
     var ok = false
     var costUSD = 0.0
@@ -25,6 +34,7 @@ struct Summary {
     var needsYou = false
     var turnEnded = false
     var liveSessions = 0
+    var attention: [Attention] = []
     var deviceConnected = false
     var lastPushMs: Int? = nil
     var renderer = ""
@@ -41,7 +51,12 @@ struct Summary {
             for sess in tool["sessions"] as? [[String: Any]] ?? [] {
                 if sess["live"] as? Bool == true { s.liveSessions += 1 }
                 if sess["needs_input"] as? Bool == true {
-                    if sess["attention_kind"] as? String == "idle" { s.turnEnded = true } else { s.needsYou = true }
+                    let kind = sess["attention_kind"] as? String == "idle" ? "idle" : "needs"
+                    if kind == "idle" { s.turnEnded = true } else { s.needsYou = true }
+                    s.attention.append(Attention(sessionID: sess["id"] as? String ?? "",
+                                                 label: sess["label"] as? String ?? "session",
+                                                 model: (sess["model"] as? String ?? "").replacingOccurrences(of: "claude-", with: ""),
+                                                 kind: kind))
                 }
             }
         }
@@ -130,6 +145,44 @@ final class PlayerViewController: NSViewController, WKNavigationDelegate {
     }
 }
 
+// MARK: - macOS notifications for session attention events
+
+final class Notifier: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = Notifier()
+    private(set) var authorized = false
+
+    func setup() {
+        let c = UNUserNotificationCenter.current()
+        c.delegate = self
+        c.requestAuthorization(options: [.alert, .sound]) { ok, _ in
+            DispatchQueue.main.async { self.authorized = ok }
+        }
+    }
+
+    func post(title: String, body: String, id: String, sound: Bool) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.threadIdentifier = "codedeck"
+        if sound { content.sound = .default }
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: id, content: content, trigger: nil))
+    }
+
+    // show banners even though we're the frontmost (accessory) app
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        if #available(macOS 11.0, *) { completionHandler([.banner, .list, .sound]) } else { completionHandler([.alert, .sound]) }
+    }
+
+    // click -> the floating dashboard
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        DispatchQueue.main.async { StatusController.shared?.showFloating() }
+        completionHandler()
+    }
+}
+
 // MARK: - Floating always-on-top dashboard window (for full menu bars, ⌥⇧D)
 
 final class FloatingPanel: NSPanel {
@@ -189,6 +242,10 @@ final class StatusController: NSResponder, NSMenuDelegate {
     var hoverEnabled: Bool { defaults.object(forKey: "hover") as? Bool ?? true }
     var readoutEnabled: Bool { defaults.object(forKey: "readout") as? Bool ?? true }
     var zoom: CGFloat { CGFloat(defaults.object(forKey: "zoom") as? Double ?? 1.0) }
+    var notifyTurnEnded: Bool { defaults.object(forKey: "notifyIdle") as? Bool ?? true }
+    var notifyNeedsYou: Bool { defaults.object(forKey: "notifyNeeds") as? Bool ?? true }
+    var notifySound: Bool { defaults.object(forKey: "notifySound") as? Bool ?? true }
+    private var seenAttention: Set<String>? = nil   // nil until the first successful poll
 
     override init() {
         // Full menu bars hide the leftmost third-party items (by the notch), so
@@ -201,6 +258,7 @@ final class StatusController: NSResponder, NSMenuDelegate {
         super.init()
         StatusController.shared = self
         registerHotKey()
+        Notifier.shared.setup()
         popover.contentViewController = player
         popover.behavior = .applicationDefined
         popover.animates = true
@@ -220,7 +278,7 @@ final class StatusController: NSResponder, NSMenuDelegate {
         }
         render()
         poll()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in self?.poll() }
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.poll() }
     }
 
     // -- readout ------------------------------------------------------------
@@ -229,8 +287,38 @@ final class StatusController: NSResponder, NSMenuDelegate {
         req.cachePolicy = .reloadIgnoringLocalCacheData
         URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
             let s = data.map(Summary.parse) ?? Summary()
-            DispatchQueue.main.async { self?.summary = s; self?.render() }
+            DispatchQueue.main.async {
+                self?.summary = s
+                self?.render()
+                self?.notifyTransitions(s)
+            }
         }.resume()
+    }
+
+    // A notification per new (session, kind): the same rule the screen uses
+    // for its blue dot, so the two never disagree. The first poll after
+    // launch only seeds the set — no stale notifications on startup.
+    private func notifyTransitions(_ s: Summary) {
+        guard s.ok else { return }
+        let now = Set(s.attention.map(\.key))
+        defer { seenAttention = now }
+        guard let seen = seenAttention else { return }
+        for a in s.attention where !seen.contains(a.key) {
+            let isIdle = a.kind == "idle"
+            if isIdle && !notifyTurnEnded { continue }
+            if !isIdle && !notifyNeedsYou { continue }
+            let detail = [a.model, String(a.sessionID.prefix(8))].filter { !$0.isEmpty }.joined(separator: " · ")
+            Notifier.shared.post(
+                title: isIdle ? "Turn ended · \(a.label)" : "Needs you · \(a.label)",
+                body: isIdle ? "The agent finished and is waiting for you. \(detail)"
+                             : "Permission prompt or question waiting. \(detail)",
+                id: "codedeck-\(a.key)-\(Int(Date().timeIntervalSince1970))",
+                sound: notifySound)
+        }
+    }
+
+    func showFloating() {
+        if floating?.isVisible != true { toggleFloating() }
     }
 
     private func render() {
@@ -360,6 +448,18 @@ final class StatusController: NSResponder, NSMenuDelegate {
         }
         size.submenu = sub
         menu.addItem(size)
+        let notif = NSMenuItem(title: "Notifications", action: nil, keyEquivalent: "")
+        let nsub = NSMenu()
+        for (title, key, on) in [("Turn ended", "notifyIdle", notifyTurnEnded),
+                                 ("Needs you", "notifyNeeds", notifyNeedsYou),
+                                 ("Sound", "notifySound", notifySound)] {
+            let it = nsub.addItem(withTitle: title, action: #selector(toggleDefault(_:)), keyEquivalent: "")
+            it.target = self; it.representedObject = key; it.state = on ? .on : .off
+        }
+        nsub.addItem(.separator())
+        nsub.addItem(withTitle: "Send a test notification", action: #selector(testNotification), keyEquivalent: "").target = self
+        notif.submenu = nsub
+        menu.addItem(notif)
         let login = menu.addItem(withTitle: "Launch at login", action: #selector(toggleLogin), keyEquivalent: "")
         login.target = self; login.state = FileManager.default.fileExists(atPath: launchAgentPath) ? .on : .off
         menu.addItem(.separator())
@@ -375,6 +475,14 @@ final class StatusController: NSResponder, NSMenuDelegate {
     @objc private func setZoom(_ sender: NSMenuItem) {
         defaults.set(sender.representedObject as? Double ?? 1.0, forKey: "zoom")
         player.zoom = zoom
+    }
+    @objc private func toggleDefault(_ sender: NSMenuItem) {
+        guard let key = sender.representedObject as? String else { return }
+        defaults.set(!(defaults.object(forKey: key) as? Bool ?? true), forKey: key)
+    }
+    @objc private func testNotification() {
+        Notifier.shared.post(title: "Turn ended · code-deck", body: "This is what a session notification looks like.",
+                             id: "codedeck-test-\(Int(Date().timeIntervalSince1970))", sound: notifySound)
     }
     @objc private func quit() { NSApp.terminate(nil) }
 
