@@ -147,15 +147,41 @@ final class PlayerViewController: NSViewController, WKNavigationDelegate {
 
 // MARK: - macOS notifications for session attention events
 
+let logURL = URL(fileURLWithPath: NSString(string: "~/Library/Logs/code-deck/menubar.log").expandingTildeInPath)
+func log(_ msg: String) {
+    let line = "\(ISO8601DateFormatter().string(from: Date())) \(msg)\n"
+    try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+    if let h = try? FileHandle(forWritingTo: logURL) { h.seekToEndOfFile(); h.write(line.data(using: .utf8)!); h.closeFile() }
+    else { try? line.write(to: logURL, atomically: true, encoding: .utf8) }
+}
+
 final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     static let shared = Notifier()
     private(set) var authorized = false
+    private(set) var status = "not requested"
 
     func setup() {
         let c = UNUserNotificationCenter.current()
         c.delegate = self
-        c.requestAuthorization(options: [.alert, .sound]) { ok, _ in
-            DispatchQueue.main.async { self.authorized = ok }
+        c.requestAuthorization(options: [.alert, .sound]) { ok, err in
+            DispatchQueue.main.async {
+                self.authorized = ok
+                self.status = ok ? "authorized" : "denied\(err.map { " (\($0.localizedDescription))" } ?? "")"
+                log("notifications: requestAuthorization ok=\(ok) error=\(err.map { String(describing: $0) } ?? "none")")
+            }
+        }
+        refreshStatus()
+    }
+
+    func refreshStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { s in
+            let names = ["not determined", "denied", "authorized", "provisional", "ephemeral"]
+            let name = names.indices.contains(s.authorizationStatus.rawValue) ? names[s.authorizationStatus.rawValue] : "\(s.authorizationStatus.rawValue)"
+            DispatchQueue.main.async {
+                self.authorized = s.authorizationStatus == .authorized
+                self.status = name
+                log("notifications: status=\(name) alerts=\(s.alertSetting.rawValue) sound=\(s.soundSetting.rawValue)")
+            }
         }
     }
 
@@ -166,7 +192,9 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         content.threadIdentifier = "codedeck"
         if sound { content.sound = .default }
         UNUserNotificationCenter.current().add(
-            UNNotificationRequest(identifier: id, content: content, trigger: nil))
+            UNNotificationRequest(identifier: id, content: content, trigger: nil)) { err in
+                log("notifications: post '\(title)' error=\(err.map { String(describing: $0) } ?? "none")")
+            }
     }
 
     // show banners even though we're the frontmost (accessory) app
@@ -461,7 +489,11 @@ final class StatusController: NSResponder, NSMenuDelegate {
             it.target = self; it.representedObject = key; it.state = on ? .on : .off
         }
         nsub.addItem(.separator())
+        let st = nsub.addItem(withTitle: "Status: \(Notifier.shared.status)", action: nil, keyEquivalent: "")
+        st.isEnabled = false
+        nsub.addItem(withTitle: "Open Notification Settings…", action: #selector(openNotifSettings), keyEquivalent: "").target = self
         nsub.addItem(withTitle: "Send a test notification", action: #selector(testNotification), keyEquivalent: "").target = self
+        Notifier.shared.refreshStatus()
         notif.submenu = nsub
         menu.addItem(notif)
         let login = menu.addItem(withTitle: "Launch at login", action: #selector(toggleLogin), keyEquivalent: "")
@@ -483,6 +515,9 @@ final class StatusController: NSResponder, NSMenuDelegate {
     @objc private func toggleDefault(_ sender: NSMenuItem) {
         guard let key = sender.representedObject as? String else { return }
         defaults.set(!(defaults.object(forKey: key) as? Bool ?? true), forKey: key)
+    }
+    @objc private func openNotifSettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(Bundle.main.bundleIdentifier ?? "")")!)
     }
     @objc private func testNotification() {
         Notifier.shared.post(title: "Turn ended · code-deck", body: "This is what a session notification looks like.",
