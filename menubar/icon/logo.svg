@@ -26,8 +26,10 @@
     <filter id="glow" filterUnits="userSpaceOnUse" x="300" y="260" width="424" height="500">
       <feGaussianBlur stdDeviation="22"/>
     </filter>
+    <!-- shadow as a blurred rect, not feDropShadow: rsvg renders a visible step
+         across the shape with feDropShadow -->
     <filter id="shadow" filterUnits="userSpaceOnUse" x="250" y="180" width="524" height="680">
-      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity="0.45"/>
+      <feGaussianBlur stdDeviation="18"/>
     </filter>
   </defs>
 
@@ -37,9 +39,10 @@
   <rect x="103" y="103" width="818" height="818" rx="182" ry="182" fill="none" stroke="#ffffff" stroke-opacity="0.11" stroke-width="5"/>
 
   <!-- the portrait screen (2:3), centred -->
-  <g filter="url(#shadow)">
-    <rect x="356" y="278" width="312" height="468" rx="44" ry="44" fill="url(#screen)"/>
+  <g filter="url(#shadow)" opacity="0.45">
+    <rect x="356" y="292" width="312" height="468" rx="44" ry="44" fill="#000"/>
   </g>
+  <rect x="356" y="278" width="312" height="468" rx="44" ry="44" fill="url(#screen)"/>
   <rect x="356" y="278" width="312" height="468" rx="44" ry="44" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="5"/>
 
   <!-- glow under the cards -->
