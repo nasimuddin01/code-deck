@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- CODE DECK — the dashboard's own silhouette: a portrait screen carrying
+       three cards in the three tool colours (Claude Code, Claude Max, Codex). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2a2a28"/>
+      <stop offset="100%" stop-color="#141413"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e1e1d"/>
+      <stop offset="100%" stop-color="#161615"/>
+    </linearGradient>
+    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f06a35"/>
+      <stop offset="100%" stop-color="#d95926"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ad89ff"/>
+      <stop offset="100%" stop-color="#9a6ff0"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4f9bf3"/>
+      <stop offset="100%" stop-color="#3987e5"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-60%" width="160%" height="220%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- squircle -->
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185" fill="url(#bg)"/>
+  <!-- inner rim highlight -->
+  <rect x="103" y="103" width="818" height="818" rx="182" ry="182" fill="none" stroke="#ffffff" stroke-opacity="0.11" stroke-width="5"/>
+
+  <!-- the portrait screen (2:3), centred -->
+  <g filter="url(#shadow)">
+    <rect x="356" y="278" width="312" height="468" rx="44" ry="44" fill="url(#screen)"/>
+  </g>
+  <rect x="356" y="278" width="312" height="468" rx="44" ry="44" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="5"/>
+
+  <!-- glow under the cards -->
+  <g filter="url(#glow)" opacity="0.55">
+    <rect x="406" y="372" width="212" height="60" rx="30" fill="#d95926"/>
+    <rect x="406" y="486" width="212" height="60" rx="30" fill="#9a6ff0"/>
+    <rect x="406" y="600" width="212" height="60" rx="30" fill="#3987e5"/>
+  </g>
+
+  <!-- the three cards -->
+  <rect x="406" y="372" width="212" height="60" rx="30" fill="url(#orange)"/>
+  <rect x="406" y="486" width="212" height="60" rx="30" fill="url(#violet)"/>
+  <rect x="406" y="600" width="212" height="60" rx="30" fill="url(#blue)"/>
+</svg>

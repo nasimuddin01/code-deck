@@ -29,3 +29,6 @@ preview*.png
 
 # menu bar app build output
 menubar/dist/
+
+# generated icons (menubar/icon/make.sh)
+menubar/icon/out/

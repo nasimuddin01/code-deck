@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18">
+  <!-- Menu bar template glyph: black shapes on transparent; macOS recolours
+       it (isTemplate). Portrait screen outline with the three cards. -->
+  <rect x="4.75" y="1.75" width="8.5" height="14.5" rx="2" fill="none" stroke="#000" stroke-width="1.5"/>
+  <rect x="7" y="5" width="4" height="1.6" rx="0.8" fill="#000"/>
+  <rect x="7" y="8.2" width="4" height="1.6" rx="0.8" fill="#000"/>
+  <rect x="7" y="11.4" width="4" height="1.6" rx="0.8" fill="#000"/>
+</svg>

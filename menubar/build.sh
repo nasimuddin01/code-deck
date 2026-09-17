@@ -31,6 +31,13 @@ swiftc "${common[@]}" -target arm64-apple-macosx13.0  -o "dist/obj/$BIN_NAME-arm
 swiftc "${common[@]}" -target x86_64-apple-macosx13.0 -o "dist/obj/$BIN_NAME-x86_64"
 lipo -create "dist/obj/$BIN_NAME-arm64" "dist/obj/$BIN_NAME-x86_64" -output "$APP/Contents/MacOS/$BIN_NAME"
 cp Info.plist "$APP/Contents/Info.plist"
+# app icon + menu bar glyph (regenerated from SVG when rsvg-convert is around)
+if [[ ! -f icon/out/icon.icns ]] && command -v rsvg-convert >/dev/null; then ./icon/make.sh >/dev/null; fi
+if [[ -f icon/out/icon.icns ]]; then
+  cp icon/out/icon.icns icon/out/MenuBarIcon.png icon/out/MenuBarIcon@2x.png "$APP/Contents/Resources/"
+else
+  echo "note: no icon (brew install librsvg, then ./icon/make.sh)"
+fi
 codesign --force --sign - "$APP" >/dev/null
 echo "built $APP ($(lipo -archs "$APP/Contents/MacOS/$BIN_NAME"))"
 

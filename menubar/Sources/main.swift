@@ -266,8 +266,12 @@ final class StatusController: NSResponder, NSMenuDelegate {
         player.zoom = zoom
 
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "rectangle.portrait.inset.filled", accessibilityDescription: "CODE DECK")
-            button.image?.isTemplate = true
+            // bundled template glyph (icon/menubar-icon.svg); SF Symbol fallback
+            let glyph = Bundle.main.image(forResource: "MenuBarIcon")
+                ?? NSImage(systemSymbolName: "rectangle.portrait.inset.filled", accessibilityDescription: "CODE DECK")
+            glyph?.isTemplate = true
+            glyph?.accessibilityDescription = "CODE DECK"
+            button.image = glyph
             button.imagePosition = .imageLeading
             button.target = self
             button.action = #selector(clicked(_:))
