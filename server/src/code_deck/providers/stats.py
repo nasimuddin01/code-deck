@@ -17,6 +17,7 @@ class SessionInfo:
     id: str
     label: str                 # working-directory name (cwd basename)
     model: str = ""
+    cwd: str = ""                # full working directory when known
     tokens_in: int = 0
     tokens_out: int = 0
     active: bool = False         # touched within ACTIVE_WINDOW (shown in list)

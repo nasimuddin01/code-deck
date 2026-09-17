@@ -22,8 +22,14 @@ struct Attention: Hashable {
     let sessionID: String
     let label: String
     let model: String
+    let cwd: String    // full working directory ("" if unknown)
     let kind: String   // "needs" (permission / question) or "idle" (turn ended)
     var key: String { "\(sessionID):\(kind)" }
+    /// cwd with the home folder abbreviated, e.g. ~/Projects/code-display
+    var shortCwd: String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return cwd.hasPrefix(home) ? "~" + cwd.dropFirst(home.count) : cwd
+    }
 }
 
 struct Summary {
@@ -56,6 +62,7 @@ struct Summary {
                     s.attention.append(Attention(sessionID: sess["id"] as? String ?? "",
                                                  label: sess["label"] as? String ?? "session",
                                                  model: (sess["model"] as? String ?? "").replacingOccurrences(of: "claude-", with: ""),
+                                                 cwd: sess["cwd"] as? String ?? "",
                                                  kind: kind))
                 }
             }
@@ -371,11 +378,13 @@ final class StatusController: NSResponder, NSMenuDelegate {
             let isIdle = a.kind == "idle"
             if isIdle && !notifyTurnEnded { continue }
             if !isIdle && !notifyNeedsYou { continue }
+            // body leads with WHERE the agent is (full cwd); model + id as a footnote
+            let where_ = a.shortCwd.isEmpty ? a.label : a.shortCwd
             let detail = [a.model, String(a.sessionID.prefix(8))].filter { !$0.isEmpty }.joined(separator: " · ")
             Notifier.shared.post(
                 title: isIdle ? "Turn ended · \(a.label)" : "Needs you · \(a.label)",
-                body: isIdle ? "The agent finished and is waiting for you. \(detail)"
-                             : "Permission prompt or question waiting. \(detail)",
+                body: (isIdle ? "Finished and waiting for you in \(where_)"
+                              : "Permission prompt or question in \(where_)") + (detail.isEmpty ? "" : "\n\(detail)"),
                 id: "codedeck-\(a.key)-\(Int(Date().timeIntervalSince1970))",
                 sound: notifySound)
         }

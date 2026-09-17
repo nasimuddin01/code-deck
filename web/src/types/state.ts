@@ -14,6 +14,7 @@ export interface SessionInfo {
   live: boolean;
   needs_input: boolean;
   attention_kind: AttentionKind;
+  cwd?: string;
 }
 
 export type ToolName = "Claude Code" | "Claude Max" | "Codex";

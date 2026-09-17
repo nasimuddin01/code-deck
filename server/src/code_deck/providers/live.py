@@ -139,6 +139,11 @@ class ClaudeCodeLiveProvider:
     def _label_for(self, path: str) -> str:
         """Working-directory basename from the transcript's `cwd` field; falls
         back to the (lossy) encoded project-dir name if none is present."""
+        cwd = self._cwd_for(path)
+        return (os.path.basename(cwd.rstrip("/")) if cwd else "") or _short_label(Path(path).parent.name)
+
+    def _cwd_for(self, path: str) -> str:
+        """Full working directory from the transcript's `cwd` field ("" if none)."""
         if path not in self._cwd_cache:
             cwd = ""
             try:
@@ -154,8 +159,8 @@ class ClaudeCodeLiveProvider:
                             break
             except OSError:
                 pass
-            self._cwd_cache[path] = os.path.basename(cwd.rstrip("/")) if cwd else ""
-        return self._cwd_cache[path] or _short_label(Path(path).parent.name)
+            self._cwd_cache[path] = cwd
+        return self._cwd_cache[path]
 
     def _update_file(self, path: str, today: str) -> dict:
         try:
@@ -276,6 +281,7 @@ class ClaudeCodeLiveProvider:
             attn_kind = flag[1] if (flag and needs_input) else ""
             sessions.append(SessionInfo(
                 id=full_id[:8], label=self._label_for(path), model=s["model"],
+                cwd=self._cwd_for(path),
                 tokens_in=s["tin"], tokens_out=s["tout"],
                 active=True, last_active=mtime,
                 live=is_live, needs_input=needs_input, attention_kind=attn_kind,
