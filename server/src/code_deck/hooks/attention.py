@@ -58,8 +58,16 @@ def main() -> None:
             pass
 
 
-if __name__ == "__main__":
+def run() -> None:
+    """Console-script entry (`code-deck-hook`). A hook failure must never
+    disrupt the calling Claude Code session, so this always exits 0."""
     try:
         main()
+    except Exception:
+        pass
     finally:
         sys.exit(0)
+
+
+if __name__ == "__main__":
+    run()

@@ -13,10 +13,9 @@ from __future__ import annotations
 import time
 import usb.core
 import usb.util
-import usb.backend.libusb1
 from PIL import Image
 
-from turzx import pixels
+from . import libusb, pixels
 
 VID, PID = 0x1A86, 0x5722
 BULK_OUT = 0x03
@@ -24,13 +23,16 @@ DATA_IFACE = 1
 DISPLAY_BITMAP = 197
 NATIVE_W, NATIVE_H = 320, 480
 
-_BACKEND = usb.backend.libusb1.get_backend(
-    find_library=lambda x: "/opt/homebrew/lib/libusb-1.0.dylib")
+
+def find_device():
+    """The TURZX device handle if plugged in, else None. Raises LibusbNotFound
+    when libusb itself is missing (so callers can tell the two apart)."""
+    return usb.core.find(idVendor=VID, idProduct=PID, backend=libusb.backend())
 
 
 class UsbRaw:
     def __init__(self):
-        dev = usb.core.find(idVendor=VID, idProduct=PID, backend=_BACKEND)
+        dev = find_device()
         if dev is None:
             raise RuntimeError(f"TURZX device {VID:04x}:{PID:04x} not found")
         self.dev = dev

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "code-deck"
+version = "2.0.0a1"
+description = "Desk dashboard for Claude Code + Codex on a TURZX 3.5\" USB screen"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Ehfaz Rezwan" }]
+keywords = ["claude-code", "codex", "dashboard", "usb", "turzx"]
+dependencies = [
+  "typer>=0.27,<1",
+  "pyusb>=1.3.1,<2",
+  "pillow>=12,<13",
+  "numpy>=2,<3",
+]
+
+[project.scripts]
+code-deck = "code_deck.cli:app"
+code-deck-hook = "code_deck.hooks.attention:run"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.13"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/code_deck"]
+artifacts = [
+  "src/code_deck/static/**",
+  "src/code_deck/layouts/*.json",
+]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["src/code_deck/static/**"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100

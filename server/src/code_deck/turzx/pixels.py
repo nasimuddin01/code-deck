@@ -11,11 +11,15 @@ import os
 import numpy as np
 from PIL import Image
 
+from ..config import CACHE_DIR
+
 # Protocol command codes that must never appear as a pixel byte.
 FORBIDDEN = frozenset([40, 41, 69, 255] + list(range(101, 111)) + [121, 122, 130, 131]
                       + list(range(160, 181)) + list(range(194, 213)))
 
-_CACHE = os.path.join(os.path.dirname(__file__), "_rgb565_safe_lut.npy")
+# cached under the user's config dir, not next to the module: site-packages is
+# read-only under pipx
+_CACHE = str(CACHE_DIR / "rgb565_safe_lut.npy")
 _LUT: np.ndarray | None = None
 
 
@@ -56,6 +60,7 @@ def lut() -> np.ndarray:
         else:
             _LUT = _build_lut()
             try:
+                os.makedirs(os.path.dirname(_CACHE), exist_ok=True)
                 np.save(_CACHE, _LUT)
             except OSError:
                 pass

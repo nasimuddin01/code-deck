@@ -15,7 +15,7 @@ import time
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .stats import SessionInfo, ToolStats
+from ..providers.stats import SessionInfo, ToolStats
 
 W, H = 320, 480
 S = 2  # supersample factor
