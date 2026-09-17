@@ -22,7 +22,8 @@
       <stop offset="0%" stop-color="#4f9bf3"/>
       <stop offset="100%" stop-color="#3987e5"/>
     </linearGradient>
-    <filter id="glow" x="-30%" y="-60%" width="160%" height="220%">
+    <!-- fixed, generous region: a bbox-relative one gets clipped by some rasterizers -->
+    <filter id="glow" filterUnits="userSpaceOnUse" x="300" y="260" width="424" height="500">
       <feGaussianBlur stdDeviation="22"/>
     </filter>
     <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
