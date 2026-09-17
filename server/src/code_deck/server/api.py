@@ -70,7 +70,7 @@ def set_brightness(request: Request, body: Brightness) -> dict:
     try:
         ctx.layouts.save(layout)
     except ValidationError as e:  # pragma: no cover - settings are already validated
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
     ctx.apply_settings(layout.settings)
     ctx.store.publish("layout_rev", ctx.layouts.rev)
     return {"brightness": body.value}

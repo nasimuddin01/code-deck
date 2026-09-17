@@ -62,6 +62,7 @@ def serve(
 ) -> None:
     """Run the server + dashboard (foreground). `service install` runs this for you."""
     import uvicorn
+
     from .log import setup
     from .runtime import Runtime
     setup(verbose)
@@ -71,7 +72,7 @@ def serve(
                      no_device=no_device, mock=mock, player_url=player_url)
     except ValueError as e:
         typer.echo(str(e), err=True)
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
     rt.start()
     typer.echo(f"CODE DECK on http://{host}:{port}  (renderer={renderer})", err=True)
     try:
@@ -84,6 +85,7 @@ def serve(
 def setup() -> None:
     """One-time: install the headless Chromium the renderer uses."""
     import subprocess
+
     from .turzx import libusb
     cmd = [sys.executable, "-m", "playwright", "install", "chromium"]
     if sys.platform.startswith("linux"):
@@ -114,7 +116,7 @@ def render(
         rt = Runtime(renderer="none", port=port, mock=mock)
     except ValueError as e:
         typer.echo(str(e), err=True)
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
     rt.start()
     server = rt.serve_in_thread()
     r = ChromiumRenderer(player_url or f"http://127.0.0.1:{port}/player?device=1")
@@ -189,7 +191,7 @@ def service_logs(lines: int = typer.Option(50, "-n")) -> None:
 def hooks_print() -> None:
     """Print the `hooks` block to merge into ~/.claude/settings.json."""
     entry = [{"hooks": [{"type": "command", "command": _hook_command()}]}]
-    typer.echo(json.dumps({"hooks": {ev: entry for ev in config.HOOK_EVENTS}}, indent=2))
+    typer.echo(json.dumps({"hooks": dict.fromkeys(config.HOOK_EVENTS, entry)}, indent=2))
 
 
 @env_app.command("print")

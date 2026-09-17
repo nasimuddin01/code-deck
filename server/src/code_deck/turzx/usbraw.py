@@ -10,7 +10,9 @@ Pixels are filtered through pixels.to_rgb565le so a residual desync cannot fire
 a screen-off/brightness/reset command hidden inside pixel data.
 """
 from __future__ import annotations
+
 import time
+
 import usb.core
 import usb.util
 from PIL import Image
@@ -59,15 +61,21 @@ class UsbRaw:
         b[5] = c
         self._w(bytes(b), timeout=2000)
 
+    # Exact vendor power-on sequence captured from the Windows app, 20 ms apart.
+    _INIT_FRAMES = (
+        bytes([0, 0, 0, 0, 0, 0xFF]),                                         # FF init
+        bytes([0, 0, 0, 0, 0, 0x6E]),                                         # brightness 0
+        bytes([0, 0, 0, 0, 0, 0x6D]),                                         # 6D
+        bytes([0, 0, 0, 0, 0, 0x7A, *([0] * 10)]),                            # 7A 16-byte
+        bytes([0, 0, 0, 0, 0, 0x79, 0x64, 0x01, 0x40, 0x01, 0xE0, *([0] * 5)]),  # 79 portrait 320x480
+    )
+
     def init(self, brightness_param: int = 39):
-        """Exact vendor power-on sequence captured from the Windows app."""
-        self._w(bytes([0, 0, 0, 0, 0, 0xFF])); time.sleep(0.02)          # FF init
-        self._w(bytes([0, 0, 0, 0, 0, 0x6E])); time.sleep(0.02)          # brightness 0
-        self._w(bytes([0, 0, 0, 0, 0, 0x6D])); time.sleep(0.02)          # 6D
-        self._w(bytes([0, 0, 0, 0, 0, 0x7A] + [0]*10)); time.sleep(0.02)  # 7A 16-byte
-        self._w(bytes([0, 0, 0, 0, 0, 0x79, 0x64, 0x01, 0x40, 0x01, 0xE0] + [0]*5))
-        time.sleep(0.02)                                                  # 79 portrait 320x480
-        self.set_brightness(brightness_param); time.sleep(0.02)
+        for frame in self._INIT_FRAMES:
+            self._w(frame)
+            time.sleep(0.02)
+        self.set_brightness(brightness_param)
+        time.sleep(0.02)
 
     def set_brightness(self, param: int = 39):
         self.cmd(0x6E, x0=max(0, min(255, param)))

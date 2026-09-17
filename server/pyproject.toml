@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "code-deck"
-version = "2.0.0a1"
+version = "2.0.0"
 description = "Desk dashboard for Claude Code + Codex on a TURZX 3.5\" USB screen"
 requires-python = ">=3.11"
 license = "MIT"
@@ -43,3 +43,14 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# explicit so CI lints the same set regardless of a developer's global ruff config
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "RUF"]
+ignore = [
+  "B008",   # typer.Option/Argument in defaults is the typer idiom
+  "E501",   # long strings in CLI help/log lines; formatter handles code
+  "SIM105", # explicit try/except/pass reads better than contextlib.suppress here
+  "RUF012", # mutable class attrs are fine for the small dataclass-free stores
+]

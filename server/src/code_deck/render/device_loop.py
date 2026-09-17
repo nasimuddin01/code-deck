@@ -16,7 +16,7 @@ from PIL import Image
 from ..config import PREVIEW_PATH, ensure_dirs
 from ..state.store import StateStore
 from . import frame_diff
-from .base import H, W, Renderer
+from .base import H, Renderer, W
 
 log = logging.getLogger(__name__)
 FULL_FRACTION = 0.60

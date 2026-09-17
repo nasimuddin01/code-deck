@@ -41,7 +41,7 @@ class ToolStats:
     quota_pct: float | None = None        # subscription usage % (Codex weekly)
     quota_resets_at: float | None = None  # epoch seconds
     note: str = ""                        # short status shown when no metric (e.g. "paused")
-    sessions: list["SessionInfo"] = field(default_factory=list)
+    sessions: list[SessionInfo] = field(default_factory=list)
 
 
 class DummyStatsProvider:
@@ -51,8 +51,8 @@ class DummyStatsProvider:
         self.rng = random.Random(42)
         self.t0 = time.time()
         self.base = {
-            "Claude Code": dict(sessions=7, tin=2_400_000, tout=310_000, cost=12.40),
-            "Codex": dict(sessions=3, tin=880_000, tout=95_000, cost=4.15),
+            "Claude Code": {"sessions": 7, "tin": 2_400_000, "tout": 310_000, "cost": 12.40},
+            "Codex": {"sessions": 3, "tin": 880_000, "tout": 95_000, "cost": 4.15},
         }
         self.models = {"Claude Code": "fable-5.1", "Codex": "gpt-5-codex"}
 

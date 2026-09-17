@@ -7,10 +7,10 @@ are served when present; otherwise `/` explains how to build them.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
-from typing import Callable
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, PlainTextResponse

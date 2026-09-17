@@ -156,7 +156,7 @@ class CodexAppServer:
     def _call(self, method: str, params: dict | None = None) -> dict | None:
         """Public entry: ensure alive, do one request, respawn once on failure."""
         with self._lock:
-            for attempt in (1, 2):
+            for _attempt in (1, 2):
                 if not self._alive() and not self._spawn():
                     return None
                 resp = self._rpc(method, params)

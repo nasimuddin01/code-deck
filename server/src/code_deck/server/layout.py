@@ -53,7 +53,7 @@ class Layout(BaseModel):
     settings: Settings = Field(default_factory=Settings)
 
     @model_validator(mode="after")
-    def _items_inside_screen(self) -> "Layout":
+    def _items_inside_screen(self) -> Layout:
         ids: set[str] = set()
         for it in self.items:
             if it.id in ids:

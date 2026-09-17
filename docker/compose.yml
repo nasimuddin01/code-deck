@@ -1,0 +1,33 @@
+# Linux / Raspberry Pi. Not for macOS: Docker Desktop cannot pass USB devices
+# through, and the Codex app-server is a macOS binary — use `pipx` + launchd there.
+#
+#   docker compose -f docker/compose.yml up -d --build
+#   open http://localhost:8765            # builder
+#
+# Claude Code on the host must point telemetry at 127.0.0.1:4318 (see
+# `code-deck env print`) and run the attention hook; the hook writes flags into
+# ~/.claude/code-deck, which is mounted read-write below.
+services:
+  code-deck:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: code-deck:local
+    restart: unless-stopped
+    devices:
+      - /dev/bus/usb:/dev/bus/usb           # TURZX 1a86:5722
+    ports:
+      - "127.0.0.1:8765:8765"               # builder / API / player
+      - "127.0.0.1:4318:4318"               # OTLP receiver for Claude Code cost
+    volumes:
+      - ${HOME}/.claude/projects:/root/.claude/projects:ro
+      - ${HOME}/.claude/code-deck:/root/.claude/code-deck   # attention flags + otel day state (rw)
+      - ${HOME}/.codex:/root/.codex:ro
+      - code-deck-data:/data                # layout.json, caches, preview.png
+    shm_size: 512m                          # headless Chromium
+    environment:
+      CODE_DECK_HOME: /data
+      CODE_DECK_OTLP_HOST: 0.0.0.0
+
+volumes:
+  code-deck-data:

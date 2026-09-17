@@ -7,15 +7,16 @@ contain a command code to the nearest visually-identical safe colour. The LUT is
 built once and cached to disk (~2 s to build, instant to load).
 """
 from __future__ import annotations
+
 import os
+
 import numpy as np
 from PIL import Image
 
 from ..config import CACHE_DIR
 
 # Protocol command codes that must never appear as a pixel byte.
-FORBIDDEN = frozenset([40, 41, 69, 255] + list(range(101, 111)) + [121, 122, 130, 131]
-                      + list(range(160, 181)) + list(range(194, 213)))
+FORBIDDEN = frozenset([40, 41, 69, 255, *list(range(101, 111)), 121, 122, 130, 131, *list(range(160, 181)), *list(range(194, 213))])
 
 # cached under the user's config dir, not next to the module: site-packages is
 # read-only under pipx

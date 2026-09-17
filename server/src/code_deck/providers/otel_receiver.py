@@ -145,7 +145,7 @@ class OtelReceiver:
             return bool(self._sessions)
 
     # -- server -------------------------------------------------------------
-    def start(self) -> "OtelReceiver":
+    def start(self) -> OtelReceiver:
         recv = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -164,7 +164,10 @@ class OtelReceiver:
                 self.end_headers()
                 self.wfile.write(b"{}")
 
-        self._srv = ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
+        # loopback by default; Docker sets CODE_DECK_OTLP_HOST=0.0.0.0 so the
+        # published port reaches the receiver
+        host = os.environ.get("CODE_DECK_OTLP_HOST", "127.0.0.1")
+        self._srv = ThreadingHTTPServer((host, self.port), Handler)
         t = threading.Thread(target=self._srv.serve_forever, daemon=True)
         t.start()
         return self
