@@ -39,18 +39,21 @@ export const SystemTile = defineWidget<P>({
     }
     const heroCol = pct !== null && pct >= props.warn ? "var(--warning)" : "var(--text)";
     const accent = color(props.accent);
-    const dw = Math.min(96, w - 28 - 14), dx = w - 14 - dw;
+    // left column: label / hero / sub; right: sparkline, vertically centred,
+    // sized so a "1.2 MB/s" hero never runs under it
+    const dw = Math.max(40, Math.min(72, w - 100)), dx = w - 12 - dw;
+    const sh = 12, sy = Math.round((h - sh) / 2) + 4;
     return (
       <>
         <div className="panel" />
-        <div className="t ell" style={{ left: 12, top: 8, maxWidth: w - 24, fontSize: 9, fontWeight: 700, color: "var(--text-muted)" }}>
+        <div className="t ell" style={{ left: 12, top: 7, maxWidth: dx - 16, fontSize: 9, fontWeight: 700, color: "var(--text-muted)" }}>
           {props.label || LABEL[props.metric]}
         </div>
-        <div className="t" style={{ left: 12, top: 22, fontSize: 18, fontWeight: 700, color: heroCol }}>{hero}</div>
-        {sub && <div className="t ell" style={{ left: 12, top: h - 14, maxWidth: w - 24, fontSize: 8, color: "var(--text-muted)" }}>{sub}</div>}
+        <div className="t ell" style={{ left: 12, top: 19, maxWidth: dx - 16, fontSize: 17, fontWeight: 700, color: heroCol }}>{hero}</div>
+        {sub && <div className="t ell" style={{ left: 12, top: h - 12, maxWidth: dx - 16, fontSize: 8, color: "var(--text-muted)" }}>{sub}</div>}
         {series.length > 1 && (
-          <div style={{ position: "absolute", left: dx, top: h - 20 }}>
-            <SparkSvg w={dw} h={12} values={series} stroke={accent} />
+          <div style={{ position: "absolute", left: dx, top: sy }}>
+            <SparkSvg w={dw} h={sh} values={series} stroke={accent} />
           </div>
         )}
       </>
