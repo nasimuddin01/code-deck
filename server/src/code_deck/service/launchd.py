@@ -11,6 +11,7 @@ import os
 import plistlib
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from ..config import HOME, IS_MAC, LAUNCHD_LABEL, LOG_DIR, ensure_dirs
@@ -55,17 +56,32 @@ def plist_dict(extra_args: list[str] | None = None) -> dict:
     }
 
 
+def _wait_unloaded(timeout: float = 10.0) -> None:
+    """`bootout` is asynchronous; bootstrapping before the old job is gone
+    fails with 'Bootstrap failed: 5: Input/output error'."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if _launchctl("print", f"{_domain()}/{LAUNCHD_LABEL}").returncode != 0:
+            return
+        time.sleep(0.25)
+
+
 def install(extra_args: list[str] | None = None) -> Path:
     _require_mac()
     ensure_dirs()
     PLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
     _launchctl("bootout", f"{_domain()}/{LAUNCHD_LABEL}")  # ignore "not loaded"
+    _wait_unloaded()
     with open(PLIST_PATH, "wb") as f:
         plistlib.dump(plist_dict(extra_args), f)
-    r = _launchctl("bootstrap", _domain(), str(PLIST_PATH))
-    if r.returncode != 0:
-        raise RuntimeError(f"launchctl bootstrap failed: {r.stderr.strip() or r.stdout.strip()}")
-    return PLIST_PATH
+    last = ""
+    for attempt in range(5):
+        r = _launchctl("bootstrap", _domain(), str(PLIST_PATH))
+        if r.returncode == 0:
+            return PLIST_PATH
+        last = r.stderr.strip() or r.stdout.strip()
+        time.sleep(0.5 * (attempt + 1))
+    raise RuntimeError(f"launchctl bootstrap failed: {last}")
 
 
 def uninstall() -> bool:

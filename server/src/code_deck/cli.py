@@ -46,37 +46,48 @@ def _read_settings() -> dict | None:
 
 @app.command()
 def serve(
-    renderer: str = typer.Option("pil", help="pil (current) | chromium (coming)"),
-    interval: float = typer.Option(config.DEFAULT_INTERVAL, help="seconds between polls"),
-    brightness: int = typer.Option(config.DEFAULT_BRIGHTNESS, min=0, max=255,
-                                   help="raw panel brightness param"),
-    overlay: bool = typer.Option(True, help="full-screen banner when a session needs you"),
-    overlay_seconds: float = typer.Option(config.DEFAULT_OVERLAY_SECONDS),
+    renderer: str = typer.Option("pil", help="pil (current) | none (API only) | chromium (coming)"),
+    host: str = typer.Option("127.0.0.1", help="0.0.0.0 to expose the builder on the LAN"),
+    port: int = typer.Option(config.DEFAULT_PORT),
+    interval: float | None = typer.Option(None, help="seconds between polls (default: layout setting)"),
+    brightness: int | None = typer.Option(None, min=0, max=255,
+                                          help="raw panel brightness (default: layout setting)"),
+    overlay: bool | None = typer.Option(None, help="full-screen banner when a session needs you"),
+    overlay_seconds: float | None = typer.Option(None),
     no_device: bool = typer.Option(False, help="render to the preview file only"),
     verbose: bool = typer.Option(False, "-v", "--verbose"),
 ) -> None:
-    """Run the dashboard (foreground). `service install` runs this for you."""
+    """Run the server + dashboard (foreground). `service install` runs this for you."""
+    import uvicorn
     from .log import setup
+    from .runtime import Runtime
     setup(verbose)
-    if renderer != "pil":
-        typer.echo(f"renderer '{renderer}' is not available yet; use --renderer pil", err=True)
+    try:
+        rt = Runtime(renderer=renderer, interval=interval, brightness=brightness,
+                     overlay=overlay, overlay_seconds=overlay_seconds, no_device=no_device)
+    except ValueError as e:
+        typer.echo(str(e), err=True)
         raise typer.Exit(2)
-    from .render.legacy_loop import LegacyLoop
-    LegacyLoop(interval=interval, brightness=brightness, overlay_enabled=overlay,
-               overlay_seconds=overlay_seconds, no_device=no_device).run()
+    rt.start()
+    typer.echo(f"CODE DECK on http://{host}:{port}  (renderer={renderer})", err=True)
+    try:
+        uvicorn.run(rt.app, host=host, port=port, log_config=None, access_log=False)
+    finally:
+        rt.shutdown()
 
 
 # -- service ----------------------------------------------------------------
 
 @service_app.command("install")
 def service_install(
-    brightness: int = typer.Option(config.DEFAULT_BRIGHTNESS, min=0, max=255),
-    overlay_seconds: float = typer.Option(config.DEFAULT_OVERLAY_SECONDS),
+    port: int = typer.Option(config.DEFAULT_PORT),
+    host: str = typer.Option("127.0.0.1"),
 ) -> None:
-    """Install + start the launchd agent (starts at login, restarts on crash)."""
+    """Install + start the launchd agent (starts at login, restarts on crash).
+    Brightness/overlay come from the layout settings so the builder can change
+    them without reinstalling."""
     from .service import launchd
-    args = ["--brightness", str(brightness), "--overlay-seconds", str(overlay_seconds)]
-    path = launchd.install(args)
+    path = launchd.install(["--host", host, "--port", str(port)])
     typer.echo(f"{OK} installed {path}")
     typer.echo(f"{OK} started {config.LAUNCHD_LABEL}; logs in {config.LOG_DIR}")
 

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "screen": { "w": 320, "h": 480 },
+  "grid": 8,
+  "items": [
+    { "id": "header", "type": "Header", "x": 0, "y": 0, "w": 320, "h": 46,
+      "props": { "title": "CODE DECK" } },
+    { "id": "card-vtx", "type": "AccountCard", "x": 8, "y": 46, "w": 304, "h": 50,
+      "props": { "variant": "cost", "tool": "Claude Code", "label": "CLAUDE · VTX", "accent": "orange" } },
+    { "id": "card-max", "type": "AccountCard", "x": 8, "y": 104, "w": 304, "h": 50,
+      "props": { "variant": "quota", "tool": "Claude Max", "label": "CLAUDE · MAX", "accent": "violet" } },
+    { "id": "card-codex", "type": "AccountCard", "x": 8, "y": 162, "w": 304, "h": 50,
+      "props": { "variant": "quota", "tool": "Codex", "label": "CODEX", "accent": "blue" } },
+    { "id": "sessions-title", "type": "Text", "x": 10, "y": 226, "w": 120, "h": 14,
+      "props": { "text": "SESSIONS", "size": 9, "color": "muted", "bold": true } },
+    { "id": "sessions", "type": "SessionList", "x": 10, "y": 242, "w": 300, "h": 216,
+      "props": { "max_rows": 5, "tools": ["Claude Code", "Claude Max", "Codex"] } },
+    { "id": "footer", "type": "Footer", "x": 0, "y": 462, "w": 320, "h": 18, "props": {} },
+    { "id": "overlay", "type": "NeedsYouOverlay", "x": 0, "y": 0, "w": 320, "h": 480, "props": {} }
+  ],
+  "settings": {
+    "overlay_enabled": true,
+    "overlay_seconds": 10,
+    "brightness": 39,
+    "refresh_seconds": 10
+  }
+}
