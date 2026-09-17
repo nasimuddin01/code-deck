@@ -61,6 +61,20 @@ device**. Turn on **live** to push every change as you make it. Settings
 holds brightness (applied instantly), the needs-you banner and refresh rate.
 `/player` is the raw device view; `/preview` a read-only frame.
 
+## Menu bar (macOS)
+
+A tiny native menu bar app shows the same dashboard on your Mac: the status
+item reads `$spend · codex%` (blue dot = a session needs you), **click** pins
+the live device frame open in a popover, **hover** peeks it. Right-click for
+the builder, popover size, hover on/off and launch-at-login.
+
+```
+./menubar/build.sh --install     # Xcode Command Line Tools are enough
+```
+
+The popover is a web view on `/player`, so it is pixel-for-pixel what the
+screen shows. `./menubar/build.sh --uninstall` removes it.
+
 ## How it works
 
 ```
