@@ -73,7 +73,10 @@ the builder, popover size, hover on/off and launch-at-login.
 ```
 
 The popover is a web view on `/player`, so it is pixel-for-pixel what the
-screen shows. `./menubar/build.sh --uninstall` removes it.
+screen shows. **Menu bar full?** The item seats itself rightmost, you can
+turn the readout off for an icon-only item, and **⌥⇧D** toggles the dashboard
+as a floating always-on-top window anywhere (drag it where you like; Esc or
+⌥⇧D again hides it). `./menubar/build.sh --uninstall` removes it.
 
 ## How it works
 

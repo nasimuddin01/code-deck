@@ -6,6 +6,7 @@
 // WebSocket. Click pins the popover open; hovering peeks it. No dependencies;
 // built with swiftc by build.sh.
 
+import Carbon.HIToolbox
 import Cocoa
 import WebKit
 
@@ -119,16 +120,54 @@ final class PlayerViewController: NSViewController, WKNavigationDelegate {
     }
 }
 
+// MARK: - Floating always-on-top dashboard window (for full menu bars, ⌥⇧D)
+
+final class FloatingPanel: NSPanel {
+    let player = PlayerViewController()
+
+    init(zoom: CGFloat) {
+        let size = NSSize(width: 320 * zoom, height: 480 * zoom)
+        super.init(contentRect: NSRect(origin: .zero, size: size),
+                   styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        level = .floating
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = true
+        isMovableByWindowBackground = true
+        hidesOnDeactivate = false
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        isReleasedWhenClosed = false
+        player.zoom = zoom
+        player.view.wantsLayer = true
+        player.view.layer?.cornerRadius = 12
+        player.view.layer?.masksToBounds = true
+        contentViewController = player
+        setFrameAutosaveName("codedeck-float")
+        if !setFrameUsingName("codedeck-float"), let screen = NSScreen.main {
+            let v = screen.visibleFrame   // default: top-right, under the menu bar
+            setFrameOrigin(NSPoint(x: v.maxX - size.width - 16, y: v.maxY - size.height - 16))
+        }
+    }
+    override var canBecomeKey: Bool { true }
+    override func cancelOperation(_ sender: Any?) { orderOut(nil) }   // Esc closes
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == UInt16(kVK_Escape) { orderOut(nil) } else { super.keyDown(with: event) }
+    }
+}
+
 // MARK: - Status item + popover controller
 
 // NSResponder so the status button's tracking area can deliver
 // mouseEntered/mouseExited here (hover peek).
 final class StatusController: NSResponder, NSMenuDelegate {
     required init?(coder: NSCoder) { fatalError() }
-    let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    static weak var shared: StatusController?
+    let item: NSStatusItem
     let popover = NSPopover()
     let player = PlayerViewController()
     let defaults = UserDefaults.standard
+    private var floating: FloatingPanel?
+    private var hotKey: EventHotKeyRef?
 
     private var pinned = false
     private var hoverTimer: Timer?
@@ -142,7 +181,16 @@ final class StatusController: NSResponder, NSMenuDelegate {
     var zoom: CGFloat { CGFloat(defaults.object(forKey: "zoom") as? Double ?? 1.0) }
 
     override init() {
+        // Full menu bars hide the leftmost third-party items (by the notch), so
+        // on first launch ask to sit rightmost among them. macOS reads the
+        // preferred position from defaults before the item is created.
+        let posKey = "NSStatusItem Preferred Position codedeck"
+        if UserDefaults.standard.object(forKey: posKey) == nil { UserDefaults.standard.set(0, forKey: posKey) }
+        item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.autosaveName = "codedeck"
         super.init()
+        StatusController.shared = self
+        registerHotKey()
         popover.contentViewController = player
         popover.behavior = .applicationDefined
         popover.animates = true
@@ -254,9 +302,37 @@ final class StatusController: NSResponder, NSMenuDelegate {
         popover.performClose(nil)
     }
 
+    // -- floating window + global hotkey ------------------------------------
+    // Carbon hot keys work without the Accessibility permission a global
+    // NSEvent key monitor would need.
+    private func registerHotKey() {
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ -> OSStatus in
+            DispatchQueue.main.async { StatusController.shared?.toggleFloating() }
+            return noErr
+        }, 1, &spec, nil, nil)
+        let id = EventHotKeyID(signature: 0x43444B31, id: 1)   // 'CDK1'
+        RegisterEventHotKey(UInt32(kVK_ANSI_D), UInt32(optionKey | shiftKey), id,
+                            GetApplicationEventTarget(), 0, &hotKey)
+    }
+
+    @objc func toggleFloating() {
+        if let f = floating, f.isVisible { f.orderOut(nil); return }
+        if floating == nil || floating!.player.zoom != zoom {
+            floating?.orderOut(nil)
+            floating = FloatingPanel(zoom: zoom)
+        }
+        close()
+        floating?.orderFrontRegardless()
+    }
+
     // -- menu ---------------------------------------------------------------
     private func showMenu() {
         let menu = NSMenu()
+        let float = menu.addItem(withTitle: floating?.isVisible == true ? "Hide floating dashboard" : "Show floating dashboard",
+                                 action: #selector(toggleFloating), keyEquivalent: "D")
+        float.keyEquivalentModifierMask = [.option, .shift]
+        float.target = self
         menu.addItem(withTitle: "Open builder", action: #selector(openBuilder), keyEquivalent: "b").target = self
         menu.addItem(withTitle: "Open player in browser", action: #selector(openPlayer), keyEquivalent: "").target = self
         menu.addItem(.separator())

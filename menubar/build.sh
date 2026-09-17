@@ -26,7 +26,7 @@ fi
 rm -rf "$APP" dist/obj
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" dist/obj
 
-common=(-O -swift-version 5 -framework Cocoa -framework WebKit Sources/main.swift)
+common=(-O -swift-version 5 -framework Cocoa -framework WebKit -framework Carbon Sources/main.swift)
 swiftc "${common[@]}" -target arm64-apple-macosx13.0  -o "dist/obj/$BIN_NAME-arm64"
 swiftc "${common[@]}" -target x86_64-apple-macosx13.0 -o "dist/obj/$BIN_NAME-x86_64"
 lipo -create "dist/obj/$BIN_NAME-arm64" "dist/obj/$BIN_NAME-x86_64" -output "$APP/Contents/MacOS/$BIN_NAME"
