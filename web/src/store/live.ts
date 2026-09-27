@@ -49,8 +49,9 @@ const LEGACY_ALL = ["Claude Code", "Claude Max", "Codex"];
 const isLegacyAll = (only: string[]) =>
   only.length === LEGACY_ALL.length && LEGACY_ALL.every((n) => only.includes(n));
 
-/** All sessions across agents, sorted like the v1 renderer: live, then
- * needs-you, then most recent. `only` (ids or names) filters; empty = all. */
+/** All sessions across agents: waiting on you first (so a blocked agent is
+ * never pushed below the fold), then live, then most recent. `only` (ids or
+ * names) filters; empty = all. */
 export function sortSessions(tools: ToolStats[], only?: string[]): SessionRow[] {
   const filter = only && only.length && !isLegacyAll(only) ? only : null;
   const rows: SessionRow[] = [];
@@ -59,8 +60,8 @@ export function sortSessions(tools: ToolStats[], only?: string[]): SessionRow[] 
     for (const s of t.sessions) rows.push({ accent: accentOf(t), tool: t.name, session: s });
   }
   rows.sort((a, b) => {
-    const ka = [a.session.live ? 1 : 0, a.session.needs_input ? 1 : 0, a.session.last_active];
-    const kb = [b.session.live ? 1 : 0, b.session.needs_input ? 1 : 0, b.session.last_active];
+    const ka = [a.session.needs_input ? 1 : 0, a.session.live ? 1 : 0, a.session.last_active];
+    const kb = [b.session.needs_input ? 1 : 0, b.session.live ? 1 : 0, b.session.last_active];
     for (let i = 0; i < 3; i++) if (ka[i] !== kb[i]) return kb[i] - ka[i];
     return 0;
   });

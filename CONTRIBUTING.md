@@ -56,12 +56,20 @@ Ship a build into the installed service: `cd web && pnpm build:server`, then
 Remember the transport: a full 320x480 frame takes ~1.9 s to push, a small
 rectangle a few ms. Widgets that change many pixels at once will feel slow.
 
-## Adding a data source
+## Adding an agent or a source type
 
-Providers are plain Python in `server/src/code_deck/providers/`; the sampler
-thread in `state/sampler.py` calls them and publishes into the `StateStore`.
-Add a section to the snapshot, mirror the type in `web/src/types/state.ts`
-(snake_case, same names), and expose a selector hook.
+Most agents need no code: `push`, `command`, `jsonl` and `otel` sources are
+configured in `agents.toml` (see `docs/agents.md`). For a new source *type*,
+write a factory `(spec, ctx) -> object with stats()` and register it with
+`code_deck.agents.register_source()` in `server/src/code_deck/agents/`, or ship
+it as a separate package through the `code_deck.sources` entry point. The
+built-ins (`agents/builtin.py`) are the reference. Sources return the payload
+shape in `agents/payload.py` or a `ToolStats`; the registry stamps id, name
+and colour, and isolates failures.
+
+Other snapshot sections (system stats and the like) are published by the
+sampler threads in `state/`; mirror any new field in `web/src/types/state.ts`
+(snake_case, same names) and expose a selector hook.
 
 ## Adding a setting
 

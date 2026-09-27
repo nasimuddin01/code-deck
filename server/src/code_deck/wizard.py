@@ -300,6 +300,8 @@ class Wizard:
         for n in self.notes:
             typer.echo(f"  - {n}")
         typer.echo("\n`code-deck doctor` re-checks everything; `code-deck init` is safe to re-run.")
+        typer.echo("Use other coding agents too? Add them in agents.toml: see docs/agents.md "
+                   "(`code-deck agents list` shows what's registered).")
 
 
 def _port_busy(port: int) -> bool:

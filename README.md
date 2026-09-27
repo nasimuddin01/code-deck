@@ -33,6 +33,8 @@ screen next to your keyboard, so you can see at a glance:
   permission prompt, a question, or a finished turn.
 - **When to look up.** A full-screen **NEEDS YOU** banner plays when a session
   blocks on a permission prompt or question.
+- **Any other agent you use.** Add your own coding agents or harnesses next to
+  the built-ins, fed by hooks, a script, log files, OpenTelemetry or a plugin.
 - **Anything else you add.** CPU, memory, disk and network tiles, clocks, text
   and dividers. Every element is a widget you can move, resize or remove.
 
@@ -77,56 +79,125 @@ The vendor's Windows software is **not** included in this repository.
 
 CODE DECK is an independent project and is not affiliated with TURZX.
 
-## Quick start (macOS)
+## Setup, step by step (macOS)
 
-You need Python 3.11+, Node 20+ with pnpm, pipx (or uv), and
-[Homebrew](https://brew.sh) for libusb.
+You need an internet connection and the TURZX screen with a USB **data**
+cable; many charge-only cables fit the port but won't work.
+
+**1. Install the tools.** Skip any you already have.
+
+```sh
+xcode-select --install                     # Command Line Tools: git, compilers
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"   # Homebrew
+brew install python node pnpm pipx libusb
+pipx ensurepath                            # then open a new terminal window
+```
+
+**2. Get the code.**
 
 ```sh
 git clone https://github.com/ehfazrezwan/code-deck.git
 cd code-deck
+```
+
+**3. Plug in the screen.** It should light up; it may stay blank until
+setup finishes. Close the vendor's app or any serial monitor if one is open.
+
+**4. Run the installer.**
+
+```sh
 ./install.sh
 ```
 
-`install.sh` checks prerequisites, builds the web app, installs the
-`code-deck` command with pipx, and then starts the **setup wizard**. Run
-`./install.sh --check` first if you only want to see what's missing.
+It checks the tools from step 1, builds the app, installs the `code-deck`
+command, and starts the setup wizard. `./install.sh --check` only reports
+what's missing.
 
-### The setup wizard
+**5. Follow the wizard.** Press Enter to accept each default. It will:
 
-`code-deck init` walks you through everything, one step at a time. Every step
-can be skipped, and it is safe to re-run.
+1. find libusb, or offer to install it;
+2. detect the screen and show a **test frame**. Answer whether you can read
+   "CODE DECK" on it;
+3. download the headless browser that draws the dashboard;
+4. check that ports 8765 and 4318 are free, and pick others if not;
+5. check Claude Code, and if needed show a settings block, then offer to copy
+   it to your clipboard;
+6. detect Codex, which is optional;
+7. save your choices to `~/.config/code-deck/.env`;
+8. install the background service, so the dashboard starts at login, and
+   open the builder.
 
-1. **libusb.** Finds it, or offers to install it with Homebrew.
-2. **The screen.** Detects the TURZX panel, waits while you plug it in, and
-   shows a test frame so you can see the connection works.
-3. **Renderer.** Installs the headless Chromium that draws the dashboard, a
-   one-time download.
-4. **Ports.** Checks that 8765 and 4318 are free and picks others if not.
-5. **Claude Code.** Checks whether the hooks and telemetry are set up, and if
-   not, shows the exact block to paste into `~/.claude/settings.json`. It can
-   copy it to your clipboard. CODE DECK never edits that file itself.
-6. **Codex.** Detects it; it's optional.
-7. **Settings.** Saves your choices to `~/.config/code-deck/.env`.
-8. **Service.** Installs a launchd agent so the dashboard starts at login and
-   restarts if it crashes, then opens the builder.
-
-`code-deck init --yes` accepts every default without prompting.
-`code-deck doctor` re-checks the whole setup at any time.
-
-### Connecting Claude Code
-
-Two pieces make the dashboard fully live. The wizard shows both, and you can
-print them any time:
+**6. Connect Claude Code.** If the wizard showed a settings block, open
+`~/.claude/settings.json`, merge the block in, and save. Then **restart your
+Claude Code sessions**, because only new sessions pick it up. You can print
+the blocks again at any time:
 
 ```sh
-code-deck hooks print   # needs-you / turn-ended status for each session
-code-deck env print     # authoritative spend via Claude Code's telemetry
+code-deck hooks print     # needs-you / turn-ended status for each session
+code-deck env print       # exact spend from Claude Code's own telemetry
 ```
 
-Merge the output into `~/.claude/settings.json`. Until telemetry is enabled,
-spend is estimated from token counts and marked `est`. Only sessions started
-after the change report telemetry.
+CODE DECK never edits that file itself.
+
+**7. Check everything.**
+
+```sh
+code-deck doctor
+```
+
+✓ and · lines are fine. ! is a warning worth reading, and ✗ must be fixed;
+each comes with the fix. The screen now shows your live usage.
+
+**8. Make it yours.** Optional.
+
+- Open the builder at `http://127.0.0.1:8765` to rearrange the screen.
+- Install the menu bar app: `./menubar/build.sh --install`.
+- Add other coding agents, as described in [Adding your own agents](#adding-your-own-agents).
+
+To re-run the wizard later, use `code-deck init`. `code-deck init --yes`
+accepts every default without prompts.
+
+### Updating
+
+```sh
+cd code-deck && git pull && ./install.sh
+```
+
+### Setup on Linux
+
+Steps 2 to 7 are the same. For step 1, install Python 3.11+, Node 20+, pnpm,
+pipx and libusb with your package manager, for example
+`sudo apt install python3 python3-venv pipx nodejs npm libusb-1.0-0`, then
+`npm install -g pnpm`. The wizard doesn't install a service on Linux: run
+`code-deck serve` under systemd, or use [Docker](#linux-and-raspberry-pi-docker).
+If the screen isn't detected, add a udev rule for USB ID `1a86:5722`.
+
+## Adding your own agents
+
+Claude Code, Claude Max and Codex are built in. Any other coding agent or
+harness can appear alongside them, with its own card, colour, session rows,
+banner and notifications. Declare it in `~/.config/code-deck/agents.toml`
+and pick how its data arrives:
+
+| Source | For an agent that… |
+|---|---|
+| `push` | can run a command on its events: `code-deck push my-agent $SESSION --state waiting` |
+| `command` | has usage you can fetch with a script that prints JSON |
+| `jsonl` | writes per-session JSON-lines logs; you map the fields |
+| `otel` | exports OpenTelemetry metrics to the built-in receiver |
+| `python` | needs custom code: a class in a file, or an installable plugin package |
+
+```toml
+[agents.my-agent]
+name = "My Agent"
+color = "#4ade80"
+source = "push"
+```
+
+You can also hide or rename a built-in. `code-deck agents list` shows every
+agent and any errors. The full guide, with the JSON format and copyable
+examples, is in [docs/agents.md](docs/agents.md) and
+[examples/agents/](examples/agents/).
 
 ## Configuration
 
@@ -148,6 +219,7 @@ value found winning:
 | `CODE_DECK_RENDERER` | `chromium` | `pil` is the legacy renderer; `none` serves the API only |
 | `CODE_DECK_CLAUDE_DIR` | `~/.claude` | Claude Code's data folder |
 | `CODE_DECK_CODEX_DIR` | `~/.codex` | Codex's data folder |
+| `CODE_DECK_AGENTS_FILE` | `~/.config/code-deck/agents.toml` | Your own agents ([guide](docs/agents.md)) |
 | `CODE_DECK_LIBUSB` | auto | Path to libusb if it isn't found automatically |
 
 `.env.example` lists the rest. Only `CODE_DECK_*` keys are loaded, so an

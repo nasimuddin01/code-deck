@@ -1,0 +1,56 @@
+# Copy to ~/.config/code-deck/agents.toml (or set CODE_DECK_AGENTS_FILE),
+# keep the entries you want, then: code-deck service restart
+# Full reference: docs/agents.md
+
+# -- tweak the built-ins -----------------------------------------------------
+# [agents.claude-max]
+# enabled = false                     # hide a card you don't use
+
+# [agents.claude-code]
+# name = "Claude"                     # rename it on cards and rows
+
+# -- push: the agent (or a hook script) reports its own status ---------------
+[agents.my-agent]
+name = "My Agent"
+color = "#4ade80"
+source = "push"
+# then, from a hook or script:
+#   code-deck push my-agent "$SESSION_ID" --state working
+#   code-deck push my-agent "$SESSION_ID" --state waiting   # blue "needs you"
+#   code-deck push my-agent "$SESSION_ID" --end
+
+# -- command: CODE DECK runs a script and reads its JSON ----------------------
+# [agents.usage-script]
+# name = "Usage"
+# source = "command"
+# command = "python3 ~/code-deck-agents/usage.py"   # see examples/agents/usage.py
+# interval = 60
+
+# -- jsonl: read the agent's own per-session log files -----------------------
+# [agents.logs]
+# name = "My CLI"
+# source = "jsonl"
+# files = "~/.my-cli/sessions/**/*.jsonl"
+# session = "file"
+# match = { type = "usage" }
+# timestamp = "timestamp"
+# model = "model"
+# cwd = "cwd"
+# tokens_in = "usage.input_tokens"
+# tokens_out = "usage.output_tokens"
+# cost = "usage.cost_usd"
+
+# -- otel: an agent that exports OpenTelemetry metrics ------------------------
+# point its OTLP/HTTP JSON exporter at http://127.0.0.1:4318
+# [agents.otel-agent]
+# name = "OTel Agent"
+# source = "otel"
+# service = "my-agent"
+# cost_metric = "my_agent.cost.usage"
+# tokens_metric = "my_agent.token.usage"
+
+# -- python: your own class ---------------------------------------------------
+# [agents.custom]
+# name = "Custom"
+# source = "python"
+# file = "~/code-deck-agents/my_agent.py"           # see examples/agents/my_agent.py
