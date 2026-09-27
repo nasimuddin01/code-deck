@@ -1,14 +1,22 @@
-# Publish the wheel to PyPI on a version tag (v2.0.0). Uses PyPI trusted
-# publishing: register this repo + workflow as a publisher for the project
-# on pypi.org first — no API token is stored anywhere.
+# Release: push a version tag (git tag v2.1.0 && git push origin v2.1.0).
+# Builds the macOS app for Apple Silicon and Intel, then publishes a GitHub
+# Release with both DMGs, their checksums and the Python wheel.
+#
+# "Run workflow" (workflow_dispatch) builds the same files as downloadable
+# artifacts without creating a release, to try a build first.
+#
+# PyPI is optional: set the repository variable PUBLISH_PYPI=true after
+# registering this repo + workflow as a trusted publisher on pypi.org (no API
+# token is stored anywhere).
 name: release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 jobs:
-  build:
+  wheel:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,16 +28,64 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: cd server && uv build
       - uses: actions/upload-artifact@v4
-        with: { name: dist, path: server/dist/* }
+        with: { name: python-dist, path: server/dist/* }
 
-  publish:
-    needs: build
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-15, arch: arm64 }
+          - { runner: macos-15-intel, arch: x86_64 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm, cache-dependency-path: web/pnpm-lock.yaml }
+      - uses: astral-sh/setup-uv@v5
+      - run: brew install libusb
+      - run: ./scripts/package-macos.sh --arch ${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: dist/release/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [wheel, macos]
     runs-on: ubuntu-latest
-    environment: pypi
-    permissions: { id-token: write, contents: write }
+    permissions: { contents: write }
     steps:
       - uses: actions/download-artifact@v4
-        with: { name: dist, path: dist }
-      - uses: pypa/gh-action-pypi-publish@release/v1
+        with: { path: out, merge-multiple: true }
       - uses: softprops/action-gh-release@v2
-        with: { files: dist/* }
+        with:
+          files: out/*
+          generate_release_notes: true
+          body: |
+            ## Download
+
+            | Mac | File |
+            |---|---|
+            | Apple Silicon (M1 and later) | `CODE-DECK-${{ github.ref_name }}-macos-arm64.dmg` |
+            | Intel | `CODE-DECK-${{ github.ref_name }}-macos-x86_64.dmg` |
+
+            Open the DMG, drag **CODE DECK** into Applications and open it. The app isn't
+            notarized, so the first time macOS asks you to confirm: open **System Settings >
+            Privacy & Security** and click **Open Anyway**. The setup window then walks you
+            through the rest.
+
+            Linux, Raspberry Pi and source installs: see the README.
+
+  pypi:
+    if: startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_PYPI == 'true'
+    needs: wheel
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions: { id-token: write }
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: python-dist, path: dist }
+      - uses: pypa/gh-action-pypi-publish@release/v1

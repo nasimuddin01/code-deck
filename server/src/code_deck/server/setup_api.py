@@ -212,11 +212,35 @@ def _telemetry_port() -> dict:
                  f"Set CODE_DECK_OTLP_PORT in {config.USER_ENV_FILE} and restart.")
 
 
+CLI_PATH = Path("~/.local/bin/code-deck").expanduser()
+
+
+def _cli() -> dict | None:
+    """Downloaded app only: offer the `code-deck` terminal command."""
+    if not config.is_app_bundle():
+        return None
+    try:
+        ours = sys.executable in CLI_PATH.read_text()
+    except OSError:
+        ours = False
+    on_path = str(CLI_PATH.parent) in os.environ.get("PATH", "").split(":")
+    if ours:
+        return _step("cli", "Terminal command (optional)", OK,
+                     f"`code-deck` is installed at {CLI_PATH}"
+                     + ("." if on_path else f". Add {CLI_PATH.parent} to your PATH to use it."))
+    return _step("cli", "Terminal command (optional)", INFO,
+                 "Install `code-deck` for the terminal: `code-deck doctor`, `code-deck push`, and more.",
+                 [{"id": "install-cli", "label": "Install command"}])
+
+
 @router.get("/status")
 def status(request: Request) -> dict:
     ctx = request.app.state.ctx
     steps = [_libusb(), _device(ctx), _chromium(ctx), _claude(), _codex(), _agents(ctx),
              _telemetry_port(), _service()]
+    cli = _cli()
+    if cli:
+        steps.append(cli)
     blocking = [s["id"] for s in steps if s["status"] == ERROR]
     return {"version": __version__, "platform": sys.platform, "steps": steps,
             "ready": not blocking, "done": setup_done(), "port": config.DEFAULT_PORT,
@@ -280,6 +304,11 @@ def action(request: Request, action: str) -> dict:
             raise HTTPException(400, "running from a development checkout; install from your installed copy")
         _restart_service_soon()
         return {"ok": True, "message": "Restarting; this page reconnects in a few seconds."}
+    if action == "install-cli" and config.is_app_bundle():
+        CLI_PATH.parent.mkdir(parents=True, exist_ok=True)
+        CLI_PATH.write_text(f'#!/bin/sh\n# CODE DECK terminal command (installed by the app)\nexec "{sys.executable}" -m code_deck "$@"\n')
+        CLI_PATH.chmod(0o755)
+        return {"ok": True, "message": f"Installed {CLI_PATH}. Open a new terminal and run `code-deck doctor`."}
     if action == "finish":
         config.HOME.mkdir(parents=True, exist_ok=True)
         (config.HOME / ".setup-done").write_text(str(time.time()))

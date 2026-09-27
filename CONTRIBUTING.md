@@ -85,6 +85,14 @@ A test fails if `.env.example` drifts from `ENV_SPEC`. The setup wizard
 (`code-deck init`, in `wizard.py`) writes the same format to
 `~/.config/code-deck/.env`.
 
+## Releasing
+
+Bump the version in `server/pyproject.toml`, `server/src/code_deck/__init__.py`,
+`web/package.json` and `menubar/Info.plist`, then push a tag (`v2.1.0`).
+`.github/workflows/release.yml` builds the macOS app for Apple Silicon and
+Intel with `scripts/package-macos.sh` and publishes a GitHub Release. Run
+the script locally to test a build first.
+
 ## Ground rules
 
 - Never commit the vendor's Windows software or anything from `turzx-win/`.

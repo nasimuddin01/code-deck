@@ -79,7 +79,38 @@ The vendor's Windows software is **not** included in this repository.
 
 CODE DECK is an independent project and is not affiliated with TURZX.
 
-## Setup, step by step (macOS)
+## Download (macOS)
+
+The easiest way. The app bundles everything it needs, so there's no Python,
+Node or Homebrew to install.
+
+1. **Download** the latest DMG from the
+   [Releases page](https://github.com/ehfazrezwan/code-deck/releases/latest):
+   `macos-arm64` for Apple Silicon (M1 and later), `macos-x86_64` for Intel Macs.
+2. **Open the DMG** and drag **CODE DECK** into Applications.
+3. **Open CODE DECK** from Applications. The app isn't notarized by Apple, so
+   the first time macOS says it can't verify it. Click **Done**, open
+   **System Settings > Privacy & Security**, scroll down, and click
+   **Open Anyway** next to CODE DECK. You only do this once.
+4. **Plug in the screen** with a USB data cable.
+5. **Follow the setup window** that opens. Each item checks itself and has a
+   button for its fix:
+   - download the dashboard renderer, a one-time download;
+   - show a test pattern on the screen;
+   - copy the Claude Code settings block, and open `settings.json` so you can
+     paste it. Then restart your Claude Code sessions;
+   - optionally install the `code-deck` terminal command.
+6. Click **Done** to open the layout builder. From then on, CODE DECK lives
+   in your menu bar and starts at login.
+
+Keep the app in Applications: the background service and the Claude Code
+hook point at it. To update, download the new DMG and replace the app;
+it restarts its service on the new version by itself.
+
+## Install from source (macOS)
+
+For development, or if you prefer building it yourself.
+
 
 You need an internet connection and the TURZX screen with a USB **data**
 cable; many charge-only cables fit the port but won't work.
@@ -149,6 +180,9 @@ code-deck doctor
 each comes with the fix. The screen now shows your live usage.
 
 **8. Make it yours.** Optional.
+
+You can also do steps 5 to 7 in a window: open `http://127.0.0.1:8765/setup`.
+
 
 - Open the builder at `http://127.0.0.1:8765` to rearrange the screen.
 - Install the menu bar app: `./menubar/build.sh --install`.
@@ -247,12 +281,16 @@ A small native app shows the same dashboard in your menu bar.
 
 - The status item reads `$spend · codex%`. A blue dot means a session is
   waiting on you.
-- **Click** pins the live dashboard open; **hover** peeks at it.
+- **Click** pins the live dashboard open; **hover** peeks at it. The bar
+  under it has **Open Builder** and **Setup** buttons.
 - **⌥⇧D** toggles it as a floating window, useful when the menu bar is full.
 - It posts **macOS notifications** when a session's turn ends or it needs you.
   Each one names the project folder.
-- Right-click for the builder, popover size, notification options and
-  launch-at-login.
+- Right-click for the builder, **Setup…**, popover size, notification
+  options and launch-at-login.
+- On first launch it opens the setup window until setup is finished.
+
+The downloaded app already is the menu bar app. From source:
 
 ```sh
 ./menubar/build.sh --install     # Xcode Command Line Tools are enough
@@ -316,6 +354,17 @@ For hot reload on the physical screen, run `pnpm dev` in `web/`, then
 `code-deck serve --player-url http://127.0.0.1:5173/player?device=1`.
 
 A new widget is one React file. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Building the downloadable app
+
+```sh
+scripts/package-macos.sh          # dist/release/CODE-DECK-<version>-macos-<arch>.dmg
+```
+
+It bundles a standalone Python with CODE DECK, its dependencies and libusb
+into the menu bar app, ad-hoc signs it and makes a DMG. Pushing a version tag
+(`git tag v2.1.0 && git push origin v2.1.0`) runs the same script on GitHub
+for Apple Silicon and Intel and publishes both DMGs as a release.
 
 ## Troubleshooting
 

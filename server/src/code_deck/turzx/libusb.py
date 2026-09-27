@@ -11,6 +11,8 @@ import sys
 from functools import lru_cache
 
 ENV_VAR = "CODE_DECK_LIBUSB"
+# the macOS app bundles libusb next to its own python (Contents/Resources/python/lib)
+BUNDLED = os.path.join(sys.prefix, "lib", "libusb-1.0.dylib" if sys.platform == "darwin" else "libusb-1.0.so.0")
 CANDIDATES = (
     "/opt/homebrew/lib/libusb-1.0.dylib",             # macOS arm64 Homebrew
     "/usr/local/lib/libusb-1.0.dylib",                # macOS x86_64 Homebrew
@@ -31,6 +33,8 @@ def find_libusb(env: os._Environ | dict = os.environ,
     override = env.get(ENV_VAR)
     if override:
         return override if os.path.exists(override) else None
+    if os.path.exists(BUNDLED):
+        return BUNDLED
     found = ctypes.util.find_library("usb-1.0")
     if found:
         return found

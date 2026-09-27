@@ -653,6 +653,14 @@ final class StatusController: NSResponder, NSMenuDelegate {
     private var launchAgentPath: String {
         NSString(string: "~/Library/LaunchAgents/\(launchAgentLabel).plist").expandingTildeInPath
     }
+    /// Downloaded app: turn launch-at-login on the first time only (the menu
+    /// item still switches it off, and that choice is kept).
+    func enableLoginOnFirstRun() {
+        guard defaults.object(forKey: "loginAutoEnabled") == nil else { return }
+        defaults.set(true, forKey: "loginAutoEnabled")
+        if !FileManager.default.fileExists(atPath: launchAgentPath) { toggleLogin() }
+    }
+
     @objc private func toggleLogin() {
         let path = launchAgentPath
         let domain = "gui/\(getuid())"
@@ -794,6 +802,9 @@ enum Server {
         DispatchQueue.global().async {
             let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
             var health = get("api/health")
+            if bundledPython != nil {
+                DispatchQueue.main.async { StatusController.shared?.enableLoginOnFirstRun() }
+            }
             if let py = bundledPython {
                 // packaged: the service should run *this* app's python and version
                 let stale = health == nil || serviceProgram != py || (health?["version"] as? String) != appVersion

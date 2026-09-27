@@ -151,13 +151,19 @@ TELEMETRY_ENV = claude_telemetry_env()
 HOOK_EVENTS = ("Notification", "Stop", "UserPromptSubmit", "SessionEnd")
 
 
+def is_app_bundle() -> bool:
+    """Running from the macOS app's bundled python (the release download)."""
+    return ".app/Contents/Resources/python" in sys.prefix
+
+
 def hook_command() -> str:
     """Absolute command Claude Code should run for the attention hook: the
     console-script shim next to this interpreter (stable under pipx), else
-    `python -m`."""
+    `python -m`. Inside the app bundle always `python -m`: script shebangs
+    there would point at the build machine, and the path has a space."""
     shim = Path(sys.executable).parent / "code-deck-hook"
-    if shim.exists():
-        return str(shim)
+    if shim.exists() and not is_app_bundle():
+        return f'"{shim}"' if " " in str(shim) else str(shim)
     return f'"{sys.executable}" -m code_deck.hooks.attention'
 
 

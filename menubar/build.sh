@@ -58,6 +58,16 @@ if [[ "${1:-}" == "--install" ]]; then
   <key>ProcessType</key><string>Interactive</string>
 </dict></plist>
 EOF
-  launchctl bootstrap "gui/$(id -u)" "$AGENT"
+  # bootout is asynchronous: bootstrapping before the old job is gone fails
+  # with "Bootstrap failed: 5: Input/output error", so wait, then retry
+  for _ in $(seq 1 40); do
+    launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1 || break
+    sleep 0.25
+  done
+  for attempt in 1 2 3 4 5; do
+    launchctl bootstrap "gui/$(id -u)" "$AGENT" 2>/dev/null && break
+    [ "$attempt" = 5 ] && { echo "launchctl bootstrap failed; open \"$INSTALLED\" by hand" >&2; exit 1; }
+    sleep 1
+  done
   echo "installed $INSTALLED — running, starts at login"
 fi
