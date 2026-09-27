@@ -257,6 +257,66 @@ def agents_list() -> None:
                    + (f"  — {a['error']}" if a.get("error") else ""))
 
 
+@app.command()
+def push(
+    agent: str = typer.Argument(..., help="agent id, e.g. my-agent (created on first push)"),
+    session: str | None = typer.Argument(None, help="session id; omit to update agent-level totals"),
+    state: str | None = typer.Option(None, help="working | waiting | done | idle"),
+    label: str | None = typer.Option(None, help="row name (default: the cwd's folder name)"),
+    cwd: str | None = typer.Option(None, help="project folder (default: current directory)"),
+    model: str | None = typer.Option(None),
+    tokens_in: int | None = typer.Option(None),
+    tokens_out: int | None = typer.Option(None),
+    cost: float | None = typer.Option(None, help="USD so far (session) or today (agent)"),
+    quota: float | None = typer.Option(None, help="agent-level quota used, 0-100"),
+    resets_at: float | None = typer.Option(None, help="agent-level quota reset, epoch seconds"),
+    note: str | None = typer.Option(None, help="agent-level short status text"),
+    end: bool = typer.Option(False, "--end", help="the session finished: remove it"),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="never fail (for hooks): no output, exit 0"),
+) -> None:
+    """Report an agent's status to the running dashboard (for scripts and hooks).
+
+    \b
+    code-deck push my-agent "$SESSION_ID" --state working
+    code-deck push my-agent "$SESSION_ID" --state waiting      # blue "needs you" + banner
+    code-deck push my-agent "$SESSION_ID" --end
+    code-deck push my-agent --cost 3.20 --quota 41
+    """
+    import os
+    import urllib.error
+    import urllib.request
+
+    base = f"http://127.0.0.1:{config.DEFAULT_PORT}/api/agents/{agent}"
+    if session is None:
+        body = {"cost_usd": cost, "quota_pct": quota, "quota_resets_at": resets_at, "note": note,
+                "model": model, "tokens_in": tokens_in, "tokens_out": tokens_out}
+        url, method = base, "POST"
+    else:
+        path = cwd or os.getcwd()
+        body = {"state": state, "label": label, "cwd": path, "model": model,
+                "tokens_in": tokens_in, "tokens_out": tokens_out, "cost_usd": cost}
+        url = f"{base}/sessions/{urllib.request.quote(session, safe='')}"
+        method = "DELETE" if end else "POST"
+    data = json.dumps({k: v for k, v in body.items() if v is not None}).encode()
+    req = urllib.request.Request(url, data=None if method == "DELETE" else data, method=method,
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=3) as r:
+            r.read()
+    except urllib.error.HTTPError as e:
+        if not quiet:
+            typer.echo(f"{BAD} {e.code}: {e.read().decode(errors='replace')}", err=True)
+            raise typer.Exit(1) from None
+        return
+    except OSError as e:
+        if not quiet:
+            typer.echo(f"{BAD} dashboard not reachable on port {config.DEFAULT_PORT}: {e}", err=True)
+            raise typer.Exit(1) from None
+        return
+    if not quiet:
+        typer.echo(f"{OK} {agent}" + (f"/{session}" if session else "") + (" ended" if end else ""))
+
+
 # -- doctor -----------------------------------------------------------------
 
 @app.command()
