@@ -103,9 +103,25 @@ struct Summary {
 
 // MARK: - Popover content: the live player
 
+/// A small borderless text button for the bar under the dashboard.
+func barButton(_ title: String, _ target: AnyObject, _ action: Selector) -> NSButton {
+    let b = NSButton(title: title, target: target, action: action)
+    b.isBordered = false
+    b.contentTintColor = NSColor(srgbRed: 0x4a / 255, green: 0xa3 / 255, blue: 1, alpha: 1)
+    b.font = .systemFont(ofSize: 11.5, weight: .medium)
+    b.sizeToFit()
+    return b
+}
+
 final class PlayerViewController: NSViewController, WKNavigationDelegate {
+    static let barHeight: CGFloat = 28
     let webView: WKWebView
-    let offline = NSTextField(labelWithString: "CODE DECK server is offline\nstart it with `code-deck service install`")
+    let offline = NSTextField(labelWithString: "CODE DECK isn't running yet.\nOpen Setup below to get it going.")
+    private let bar = NSView()
+    private var builderButton: NSButton!
+    private var setupButton: NSButton!
+    var onBuilder: (() -> Void)?
+    var onSetup: (() -> Void)?
     // scaling is done by the page (/player?scale=N), never by zooming the web
     // view: a zoomed page can scroll sideways by a pixel and stay offset
     var zoom: CGFloat = 1.0 { didSet { if zoom != oldValue { apply(); load() } } }
@@ -134,19 +150,36 @@ final class PlayerViewController: NSViewController, WKNavigationDelegate {
         offline.isHidden = true
         offline.autoresizingMask = [.width, .minYMargin, .maxYMargin]
         v.addSubview(offline)
+        bar.wantsLayer = true
+        bar.layer?.backgroundColor = NSColor(srgbRed: 0x13 / 255, green: 0x13 / 255, blue: 0x12 / 255, alpha: 1).cgColor
+        builderButton = barButton("Open Builder ↗", self, #selector(builderTapped))
+        setupButton = barButton("Setup", self, #selector(setupTapped))
+        setupButton.contentTintColor = muted
+        bar.addSubview(builderButton)
+        bar.addSubview(setupButton)
+        v.addSubview(bar)
         view = v
         apply()
         load()
     }
 
-    var size: NSSize { NSSize(width: 320 * zoom, height: 480 * zoom) }
+    var screenSize: NSSize { NSSize(width: 320 * zoom, height: 480 * zoom) }
+    var size: NSSize { NSSize(width: screenSize.width, height: screenSize.height + Self.barHeight) }
 
     func apply() {
         preferredContentSize = size
         view.frame = NSRect(origin: .zero, size: size)
-        webView.frame = view.bounds
-        offline.frame = NSRect(x: 16, y: size.height / 2 - 24, width: size.width - 32, height: 48)
+        let h = Self.barHeight
+        webView.frame = NSRect(x: 0, y: h, width: screenSize.width, height: screenSize.height)
+        offline.frame = NSRect(x: 16, y: h + screenSize.height / 2 - 24, width: screenSize.width - 32, height: 48)
+        bar.frame = NSRect(x: 0, y: 0, width: size.width, height: h)
+        builderButton.setFrameOrigin(NSPoint(x: 10, y: (h - builderButton.frame.height) / 2))
+        setupButton.setFrameOrigin(NSPoint(x: size.width - setupButton.frame.width - 10,
+                                           y: (h - setupButton.frame.height) / 2))
     }
+
+    @objc private func builderTapped() { onBuilder?() }
+    @objc private func setupTapped() { onSetup?() }
 
     func load() {
         var c = URLComponents(url: serverURL.appendingPathComponent("player"), resolvingAgainstBaseURL: false)!
@@ -278,7 +311,7 @@ final class FloatingPanel: NSPanel {
     let player = PlayerViewController()
 
     init(zoom: CGFloat) {
-        let size = NSSize(width: 320 * zoom, height: 480 * zoom)
+        let size = NSSize(width: 320 * zoom, height: 480 * zoom + PlayerViewController.barHeight)
         super.init(contentRect: NSRect(origin: .zero, size: size),
                    styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         level = .floating
@@ -290,6 +323,8 @@ final class FloatingPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         isReleasedWhenClosed = false
         player.zoom = zoom
+        player.onBuilder = { StatusController.shared?.openBuilderNow() }
+        player.onSetup = { SetupWindow.show() }
         player.view.wantsLayer = true
         player.view.layer?.cornerRadius = 12
         player.view.layer?.masksToBounds = true
@@ -349,6 +384,8 @@ final class StatusController: NSResponder, NSMenuDelegate {
         registerHotKey()
         Notifier.shared.setup()
         popover.contentViewController = player
+        player.onBuilder = { [weak self] in self?.openBuilderNow() }
+        player.onSetup = { [weak self] in self?.close(); SetupWindow.show() }
         popover.behavior = .applicationDefined
         popover.animates = true
         popover.appearance = NSAppearance(named: .darkAqua)
@@ -533,7 +570,8 @@ final class StatusController: NSResponder, NSMenuDelegate {
                                  action: #selector(toggleFloating), keyEquivalent: "D")
         float.keyEquivalentModifierMask = [.option, .shift]
         float.target = self
-        menu.addItem(withTitle: "Open builder", action: #selector(openBuilder), keyEquivalent: "b").target = self
+        menu.addItem(withTitle: "Open Builder", action: #selector(openBuilder), keyEquivalent: "b").target = self
+        menu.addItem(withTitle: "Setup…", action: #selector(openSetup), keyEquivalent: ",").target = self
         menu.addItem(withTitle: "Open player in browser", action: #selector(openPlayer), keyEquivalent: "").target = self
         menu.addItem(.separator())
         let hover = menu.addItem(withTitle: "Show on hover", action: #selector(toggleHover), keyEquivalent: "")
@@ -579,7 +617,13 @@ final class StatusController: NSResponder, NSMenuDelegate {
         if let button = item.button { menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button) }
     }
 
-    @objc private func openBuilder() { NSWorkspace.shared.open(serverURL) }
+    @objc private func openBuilder() { openBuilderNow() }
+    func openBuilderNow() {
+        close()
+        floating?.orderOut(nil)
+        NSWorkspace.shared.open(serverURL)
+    }
+    @objc private func openSetup() { close(); SetupWindow.show() }
     @objc private func openPlayer() { NSWorkspace.shared.open(serverURL.appendingPathComponent("player")) }
     @objc private func toggleHover() { defaults.set(!hoverEnabled, forKey: "hover") }
     @objc private func toggleReadout() { defaults.set(!readoutEnabled, forKey: "readout"); render() }
@@ -636,12 +680,158 @@ final class StatusController: NSResponder, NSMenuDelegate {
     }
 }
 
+// MARK: - Setup window (the web app's /setup page in a native window)
+
+final class SetupWindow: NSObject, NSWindowDelegate, WKNavigationDelegate {
+    private static var current: SetupWindow?
+    private let window: NSWindow
+    private let web: WKWebView
+
+    static func show() {
+        log("setup: showing window")
+        if current == nil { current = SetupWindow() }
+        NSApp.activate(ignoringOtherApps: true)   // accessory app: bring the window forward
+        current?.window.makeKeyAndOrderFront(nil)
+        current?.reload()
+    }
+
+    private override init() {
+        web = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 860),
+                          styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                          backing: .buffered, defer: false)
+        super.init()
+        window.title = "CODE DECK Setup"
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.backgroundColor = NSColor(srgbRed: 0x1a / 255, green: 0x1a / 255, blue: 0x19 / 255, alpha: 1)
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.contentMinSize = NSSize(width: 640, height: 520)
+        web.setValue(false, forKey: "drawsBackground")
+        web.navigationDelegate = self
+        window.contentView = web
+        window.setFrameAutosaveName("codedeck-setup")
+        if !window.setFrameUsingName("codedeck-setup") { window.center() }
+    }
+
+    func reload() {
+        web.load(URLRequest(url: serverURL.appendingPathComponent("setup"), cachePolicy: .reloadIgnoringLocalCacheData))
+    }
+
+    // "Done: open the builder" navigates to /; links (docs) are external. Both go
+    // to the browser, and finishing closes this window.
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let url = action.request.url else { return decisionHandler(.allow) }
+        // the page's own iframe (the live screen preview) loads freely
+        if action.targetFrame?.isMainFrame == false { return decisionHandler(.allow) }
+        let ours = url.host == serverURL.host && url.port == serverURL.port
+        if ours && url.path.hasPrefix("/setup") { return decisionHandler(.allow) }
+        NSWorkspace.shared.open(url)
+        if ours { window.close() }
+        decisionHandler(.cancel)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        let html = """
+        <body style="background:#1a1a19;color:#a8a8a2;font:13px -apple-system;padding:40px">
+        <h2 style="color:#ecece8">CODE DECK isn't running</h2>
+        <p>Starting it can take a few seconds. This page retries on its own.</p>
+        <p>Installed from source? Run <code>./install.sh</code> in the repository.</p>
+        <script>setTimeout(()=>location.replace('\(serverURL.appendingPathComponent("setup").absoluteString)'),3000)</script>
+        </body>
+        """
+        webView.loadHTMLString(html, baseURL: nil)
+    }
+
+    func windowWillClose(_ notification: Notification) { SetupWindow.current = nil }
+}
+
+// MARK: - The bundled server (release builds ship Python + CODE DECK inside the app)
+
+enum Server {
+    /// Contents/Resources/python/bin/python3 in a packaged app; nil in a dev build.
+    static var bundledPython: String? {
+        guard let res = Bundle.main.resourcePath else { return nil }
+        let p = res + "/python/bin/python3"
+        return FileManager.default.isExecutableFile(atPath: p) ? p : nil
+    }
+
+    static func get(_ path: String, timeout: TimeInterval = 2) -> [String: Any]? {
+        var req = URLRequest(url: serverURL.appendingPathComponent(path), timeoutInterval: timeout)
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        let sem = DispatchSemaphore(value: 0)
+        var out: [String: Any]?
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            out = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            sem.signal()
+        }.resume()
+        _ = sem.wait(timeout: .now() + timeout + 0.5)
+        return out
+    }
+
+    /// Where the installed background service's plist points (its python).
+    static var serviceProgram: String? {
+        let path = NSString(string: "~/Library/LaunchAgents/com.codedeck.server.plist").expandingTildeInPath
+        guard let d = NSDictionary(contentsOfFile: path), let args = d["ProgramArguments"] as? [String] else { return nil }
+        return args.first
+    }
+
+    /// Install (or re-point) the background service at the bundled python.
+    static func installService() {
+        guard let py = bundledPython else { return }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: py)
+        p.arguments = ["-m", "code_deck", "service", "install"]
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        do { try p.run(); p.waitUntilExit() } catch { log("server: service install failed: \(error)") }
+        log("server: service install exit=\(p.terminationStatus)")
+    }
+
+    /// On launch: make sure a server is running, then open Setup if it was never finished.
+    static func ensureRunningThenSetup() {
+        DispatchQueue.global().async {
+            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+            var health = get("api/health")
+            if let py = bundledPython {
+                // packaged: the service should run *this* app's python and version
+                let stale = health == nil || serviceProgram != py || (health?["version"] as? String) != appVersion
+                if stale && (health == nil || serviceProgram == nil || serviceProgram == py
+                             || serviceProgram!.contains(".app/Contents/Resources/python")) {
+                    log("server: starting bundled server (health=\(health != nil), program=\(serviceProgram ?? "none"))")
+                    installService()
+                    for _ in 0..<40 {
+                        Thread.sleep(forTimeInterval: 0.5)
+                        health = get("api/health")
+                        if health != nil { break }
+                    }
+                }
+            }
+            guard health != nil else {
+                DispatchQueue.main.async { if bundledPython != nil || UserDefaults.standard.bool(forKey: "setupShown") == false { SetupWindow.show() } }
+                return
+            }
+            let status = get("api/setup/status", timeout: 6)
+            let done = (status?["done"] as? Bool) ?? true
+            log("setup: server up, status=\(status == nil ? "unavailable" : "ok") done=\(done)")
+            if !done {
+                DispatchQueue.main.async {
+                    UserDefaults.standard.set(true, forKey: "setupShown")
+                    SetupWindow.show()
+                }
+            }
+        }
+    }
+}
+
 // MARK: - App
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var status: StatusController?
     func applicationDidFinishLaunching(_ notification: Notification) {
         status = StatusController()
+        Server.ensureRunningThenSetup()
     }
 }
 
