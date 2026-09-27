@@ -59,6 +59,8 @@ class OtelReceiver:
         # session_id -> {"cost": float, "tin": float, "tout": float, "model": str}
         self._sessions: dict[str, dict] = {}
         self._srv: ThreadingHTTPServer | None = None
+        # extra consumers of every OTLP payload (`otel` agents), called after ingest
+        self.listeners: list = []
         self._load()
 
     # -- persistence (lock held by callers where it matters) -----------------
@@ -113,6 +115,11 @@ class OtelReceiver:
                                 bucket = "tout" if attrs.get("type") == "output" else "tin"
                                 self._add(dp, bucket, _dp_value(dp), attrs)
             self._save()
+        for cb in list(self.listeners):
+            try:
+                cb(payload)
+            except Exception:
+                pass   # a broken agent source must not break Claude Code cost
 
     def _add(self, dp: dict, field: str, val: float, attrs: dict | None = None) -> None:
         attrs = attrs or _dp_attrs(dp)
