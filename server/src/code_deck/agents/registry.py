@@ -114,6 +114,9 @@ class AgentRegistry:
             else:
                 try:
                     st = src.stats()
+                    if isinstance(st, dict):          # plugins may return the payload shape
+                        from .payload import stats_from
+                        st = stats_from(spec.name, st)
                     self._agent_errors.pop(spec.id, None)
                 except Exception as e:
                     log.warning("agent %s stats failed: %s", spec.id, e)
@@ -153,4 +156,6 @@ def _ensure_builtins() -> None:
         jsonl,
         otel,
         push,
+        python,
     )
+    python.load_entry_points()   # installed plugin packages (`code_deck.sources` group)

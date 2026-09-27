@@ -14,7 +14,11 @@ agent gets its data from a *source*:
 Agents are declared in ~/.config/code-deck/agents.toml (CODE_DECK_AGENTS_FILE);
 see docs/agents.md.
 """
-from .registry import AgentRegistry, register_source
+from ..providers.stats import SessionInfo, ToolStats
+from .payload import session_from, stats_from
+from .registry import AgentRegistry, SourceContext, register_source
 from .spec import AgentSpec, load_specs
 
-__all__ = ["AgentRegistry", "AgentSpec", "load_specs", "register_source"]
+# the plugin-facing API: everything a source needs
+__all__ = ["AgentRegistry", "AgentSpec", "SessionInfo", "SourceContext", "ToolStats",
+           "load_specs", "register_source", "session_from", "stats_from"]
