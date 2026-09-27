@@ -22,6 +22,10 @@ dependencies = [
   "playwright>=1.55,<2",
 ]
 
+
+[project.urls]
+Homepage = "https://github.com/ehfazrezwan/code-deck"
+Issues = "https://github.com/ehfazrezwan/code-deck/issues"
 [project.scripts]
 code-deck = "code_deck.cli:app"
 code-deck-hook = "code_deck.hooks.attention:run"

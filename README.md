@@ -83,7 +83,7 @@ You need Python 3.11+, Node 20+ with pnpm, pipx (or uv), and
 [Homebrew](https://brew.sh) for libusb.
 
 ```sh
-git clone https://github.com/<you>/code-deck.git
+git clone https://github.com/ehfazrezwan/code-deck.git
 cd code-deck
 ./install.sh
 ```
