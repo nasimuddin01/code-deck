@@ -69,3 +69,10 @@ export const TOOL_ACCENT: Record<string, string> = {
   "Claude Max": "var(--violet)",
   Codex: "var(--blue)",
 };
+
+/** An agent's colour: its agents.toml colour, else the built-in accent. */
+export function accentOf(tool: { name: string; color?: string } | undefined): string {
+  if (!tool) return "var(--blue)";
+  if (tool.color) return color(tool.color);
+  return TOOL_ACCENT[tool.name] ?? "var(--blue)";
+}

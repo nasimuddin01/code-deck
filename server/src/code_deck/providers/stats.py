@@ -43,6 +43,9 @@ class ToolStats:
     quota_resets_at: float | None = None  # epoch seconds
     note: str = ""                        # short status shown when no metric (e.g. "paused")
     sessions: list[SessionInfo] = field(default_factory=list)
+    agent_id: str = ""                    # registry id ("claude-code", "aider", ...)
+    color: str = ""                       # theme name or hex, from agents.toml
+    source: str = ""                      # which source produced it (claude-code, push, command, ...)
 
 
 class DummyStatsProvider:

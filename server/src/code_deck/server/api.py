@@ -35,6 +35,12 @@ def state(request: Request) -> dict:
     return _ctx(request).store.snapshot()
 
 
+@router.get("/agents")
+def list_agents(request: Request) -> list[dict]:
+    """Every agent: built-ins, agents.toml entries and on-the-fly pushed ones."""
+    return _ctx(request).store.get("agents")
+
+
 @router.get("/layout")
 def get_layout(request: Request) -> dict:
     return _ctx(request).layouts.load().model_dump()

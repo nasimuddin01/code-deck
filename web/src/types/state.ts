@@ -34,6 +34,20 @@ export interface ToolStats {
   quota_resets_at: number | null;
   note: string;
   sessions: SessionInfo[];
+  agent_id?: string;   // registry id: "claude-code", "codex", "aider", ...
+  color?: string;      // theme name or hex from agents.toml
+  source?: string;     // claude-code | claude-max | codex | push | command | jsonl | otel | python
+}
+
+export interface AgentInfo {
+  id: string;
+  name: string;
+  color: string;
+  source: string;
+  enabled: boolean;
+  builtin: boolean;
+  dynamic: boolean;
+  error: string;
 }
 
 export type SystemMetric = "cpu_pct" | "mem_pct" | "net_up_bps" | "net_down_bps";
@@ -74,6 +88,7 @@ export interface Snapshot {
   rev: number;
   ts: number;
   tools: ToolStats[];
+  agents?: AgentInfo[];
   system: SystemStats | null;
   attention: { overlay: Overlay | null };
   device: DeviceState;

@@ -14,7 +14,7 @@
     { "id": "sessions-title", "type": "Text", "x": 10, "y": 226, "w": 120, "h": 14,
       "props": { "text": "SESSIONS", "size": 9, "color": "muted", "bold": true } },
     { "id": "sessions", "type": "SessionList", "x": 10, "y": 242, "w": 300, "h": 216,
-      "props": { "max_rows": 5, "tools": ["Claude Code", "Claude Max", "Codex"] } },
+      "props": { "max_rows": 5, "tools": [] } },
     { "id": "footer", "type": "Footer", "x": 0, "y": 462, "w": 320, "h": 18, "props": {} },
     { "id": "overlay", "type": "NeedsYouOverlay", "x": 0, "y": 0, "w": 320, "h": 480, "props": {} }
   ],

@@ -16,10 +16,13 @@ app = typer.Typer(help="CODE DECK — Claude Code + Codex dashboard on a TURZX U
 service_app = typer.Typer(help="Manage the background service (macOS launchd).",
                           no_args_is_help=True)
 hooks_app = typer.Typer(help="Claude Code hook integration.", no_args_is_help=True)
+agents_app = typer.Typer(help="Your coding agents: built-ins plus agents.toml (docs/agents.md).",
+                         no_args_is_help=True)
 env_app = typer.Typer(help="CODE DECK .env template and Claude Code telemetry env.", no_args_is_help=True)
 app.add_typer(service_app, name="service")
 app.add_typer(hooks_app, name="hooks")
 app.add_typer(env_app, name="env")
+app.add_typer(agents_app, name="agents")
 
 OK, BAD, WARN, INFO = "✓", "✗", "!", "·"
 
@@ -222,6 +225,38 @@ def env_print() -> None:
     typer.echo(json.dumps({"env": config.TELEMETRY_ENV}, indent=2))
 
 
+# -- agents -------------------------------------------------------------------
+
+def _server_get(path: str, timeout: float = 1.5):
+    import urllib.request
+    with urllib.request.urlopen(f"http://127.0.0.1:{config.DEFAULT_PORT}{path}", timeout=timeout) as r:
+        return json.loads(r.read())
+
+
+@agents_app.command("list")
+def agents_list() -> None:
+    """Show every agent and where its data comes from."""
+    try:
+        agents = _server_get("/api/agents")
+        if not isinstance(agents, list):
+            raise ValueError("unexpected response")
+        where = "running server"
+    except (OSError, ValueError):   # not running, or an older server without /api/agents
+        from .agents import load_specs
+        specs, errors = load_specs()
+        agents = [{**s.public(), "error": ""} for s in specs]
+        where = f"{config.AGENTS_FILE} (server not reachable, or an older version)"
+        for e in errors:
+            typer.echo(f"{BAD} {e}")
+    typer.echo(f"{INFO} from {where}")
+    for a in agents:
+        mark = BAD if a.get("error") else (OK if a["enabled"] else INFO)
+        tags = ", ".join(t for t, on in (("built-in", a.get("builtin")), ("pushed", a.get("dynamic")),
+                                          ("disabled", not a["enabled"])) if on)
+        typer.echo(f"{mark} {a['id']:<16} {a['name']:<18} {a['source']:<12} {a['color']:<9} {tags}"
+                   + (f"  — {a['error']}" if a.get("error") else ""))
+
+
 # -- doctor -----------------------------------------------------------------
 
 @app.command()
@@ -282,6 +317,13 @@ def doctor() -> None:
         bound = s.connect_ex(("127.0.0.1", config.OTLP_PORT)) == 0
     line(OK if bound else INFO,
          f"OTLP receiver port {config.OTLP_PORT}: " + ("listening" if bound else "not listening (starts with serve)"))
+
+    from .agents import load_specs
+    specs, agent_errors = load_specs()
+    custom = [s.id for s in specs if not s.builtin]
+    for e in agent_errors:
+        line(BAD, f"agents.toml: {e}")
+    line(INFO, f"agents: {len(specs)} ({', '.join(custom) or 'built-ins only'}) · {config.AGENTS_FILE}")
 
     line(OK if config.CODEX_APPSERVER_BIN.exists() else INFO,
          "codex app-server: " + ("found" if config.CODEX_APPSERVER_BIN.exists()

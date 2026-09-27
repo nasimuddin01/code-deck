@@ -48,10 +48,9 @@ class Runtime:
         self.ctx.settings_listeners.append(self._on_settings)
         self.app = create_app(self.ctx)
 
-        self.threads: list[threading.Thread] = [
-            StatsSampler(self.store, self.tracker, self.interval, self.stop, mock=mock),
-            SystemSampler(self.store, self.stop),
-        ]
+        self.sampler = StatsSampler(self.store, self.tracker, self.interval, self.stop, mock=mock)
+        self.ctx.sampler = self.sampler
+        self.threads: list[threading.Thread] = [self.sampler, SystemSampler(self.store, self.stop)]
         self.renderer_name = renderer
         if renderer == "pil":
             from .render.legacy_loop import PilDeviceLoop
@@ -80,6 +79,7 @@ class Runtime:
 
     def shutdown(self) -> None:
         self.stop.set()
+        self.sampler.wake()
         for t in self.threads:
             t.join(timeout=8)
 

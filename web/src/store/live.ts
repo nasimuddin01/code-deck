@@ -1,7 +1,8 @@
 import { create } from "zustand";
 
 import { bumpDirty, setRev } from "../lib/dirty";
-import type { DeviceState, Overlay, SessionInfo, Snapshot, SystemStats, ToolStats } from "../types/state";
+import { accentOf } from "../lib/format";
+import type { AgentInfo, DeviceState, Overlay, SessionInfo, Snapshot, SystemStats, ToolStats } from "../types/state";
 
 interface LiveState {
   snapshot: Snapshot | null;
@@ -25,8 +26,13 @@ export const useLive = create<LiveState>((set) => ({
 const EMPTY_TOOLS: ToolStats[] = [];
 
 export const useTools = (): ToolStats[] => useLive((s) => s.snapshot?.tools ?? EMPTY_TOOLS);
-export const useTool = (name: string): ToolStats | undefined =>
-  useLive((s) => s.snapshot?.tools.find((t) => t.name === name));
+const EMPTY_AGENTS: AgentInfo[] = [];
+
+/** An agent's stats by registry id ("codex") or display name ("Codex"). */
+export const matchesTool = (t: ToolStats, ref: string): boolean => t.agent_id === ref || t.name === ref;
+export const useTool = (ref: string): ToolStats | undefined =>
+  useLive((s) => s.snapshot?.tools.find((t) => matchesTool(t, ref)));
+export const useAgents = (): AgentInfo[] => useLive((s) => s.snapshot?.agents ?? EMPTY_AGENTS);
 export const useSystem = (): SystemStats | null => useLive((s) => s.snapshot?.system ?? null);
 export const useOverlay = (): Overlay | null => useLive((s) => s.snapshot?.attention.overlay ?? null);
 export const useDevice = (): DeviceState | undefined => useLive((s) => s.snapshot?.device);
@@ -37,13 +43,20 @@ export interface SessionRow {
   session: SessionInfo;
 }
 
-/** All sessions across tools, sorted like the v1 renderer: live, then
- * needs-you, then most recent. */
-export function sortSessions(tools: ToolStats[], accents: Record<string, string>, only?: string[]): SessionRow[] {
+// Layouts saved before custom agents listed these three explicitly; treat
+// that list as "every agent" so new agents show up without editing the layout.
+const LEGACY_ALL = ["Claude Code", "Claude Max", "Codex"];
+const isLegacyAll = (only: string[]) =>
+  only.length === LEGACY_ALL.length && LEGACY_ALL.every((n) => only.includes(n));
+
+/** All sessions across agents, sorted like the v1 renderer: live, then
+ * needs-you, then most recent. `only` (ids or names) filters; empty = all. */
+export function sortSessions(tools: ToolStats[], only?: string[]): SessionRow[] {
+  const filter = only && only.length && !isLegacyAll(only) ? only : null;
   const rows: SessionRow[] = [];
   for (const t of tools) {
-    if (only && only.length && !only.includes(t.name)) continue;
-    for (const s of t.sessions) rows.push({ accent: accents[t.name] ?? "var(--blue)", tool: t.name, session: s });
+    if (filter && !filter.some((ref) => matchesTool(t, ref))) continue;
+    for (const s of t.sessions) rows.push({ accent: accentOf(t), tool: t.name, session: s });
   }
   rows.sort((a, b) => {
     const ka = [a.session.live ? 1 : 0, a.session.needs_input ? 1 : 0, a.session.last_active];

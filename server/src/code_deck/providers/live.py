@@ -22,7 +22,6 @@ from pathlib import Path
 
 from .. import config
 from .codex_appserver import CodexAppServer
-from .otel_receiver import OtelReceiver
 from .stats import SessionInfo, ToolStats
 
 CLAUDE_PROJECTS = config.CLAUDE_PROJECTS
@@ -485,26 +484,3 @@ class ClaudeMaxProvider:
             quota_resets_at=reset,
             note=note,
         )
-
-
-class LiveStatsProvider:
-    """Composite: Claude Code (Vertex $) + Claude Max (quota) + Codex (quota).
-
-    Owns the in-process OTLP receiver so Claude Code sessions that export
-    telemetry (~/.claude/settings.json env) report authoritative $ here. The
-    receiver is best-effort: if the port is taken or binding fails, the Claude
-    Code card silently falls back to the token-price estimate.
-    """
-
-    def __init__(self) -> None:
-        self.otel = None
-        try:
-            self.otel = OtelReceiver().start()
-        except OSError:
-            self.otel = None
-        self.cc = ClaudeCodeLiveProvider(otel=self.otel)
-        self.cmax = ClaudeMaxProvider()
-        self.codex = CodexLiveProvider()
-
-    def get_stats(self) -> list[ToolStats]:
-        return [self.cc.stats(), self.cmax.stats(), self.codex.stats()]

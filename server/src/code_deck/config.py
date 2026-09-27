@@ -114,6 +114,7 @@ STATE_DIR = CLAUDE_DIR / "code-deck"                     # attention flags + ote
 ATTENTION_DIR = STATE_DIR / "attention"
 OTEL_STATE_PATH = STATE_DIR / "otel_state.json"
 CODEX_DIR = _env_path("CODEX_DIR", "~/.codex")
+AGENTS_FILE = _env_path("AGENTS_FILE", str(HOME / "agents.toml"))  # custom agents, see docs/agents.md
 CODEX_APPSERVER_BIN = _env_path("CODEX_APPSERVER", str(CODEX_DIR / "plugins/.plugin-appserver/codex"))
 
 # -- network ------------------------------------------------------------------
@@ -179,6 +180,7 @@ ENV_SPEC: tuple[tuple[str, str, str, str], ...] = (
     ("LIBUSB", "", "Full path to libusb-1.0 if it isn't found automatically.", "Device"),
     ("HOME", "~/.config/code-deck", "Layout, preview frame and cache.", "Paths"),
     ("LOG_DIR", "", "Log files. Default: ~/Library/Logs/code-deck on macOS, CODE_DECK_HOME/logs elsewhere.", "Paths"),
+    ("AGENTS_FILE", "~/.config/code-deck/agents.toml", "Your own coding agents (see docs/agents.md).", "Paths"),
     ("CLAUDE_DIR", "~/.claude", "Claude Code's data folder (transcripts, settings.json).", "Paths"),
     ("CODEX_DIR", "~/.codex", "Codex's data folder (sessions, app-server).", "Paths"),
     ("CODEX_APPSERVER", "", "Codex app-server binary for live quota. Default: CODE_DECK_CODEX_DIR/plugins/.plugin-appserver/codex.", "Paths"),

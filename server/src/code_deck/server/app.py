@@ -11,6 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, PlainTextResponse
@@ -30,6 +31,8 @@ class AppContext:
     # called when settings change (brightness, overlay); the device loop and
     # tracker subscribe by passing a callback
     settings_listeners: list[Callable[[Settings], None]] = field(default_factory=list)
+    # the stats sampler (owns the agent registry); None in API-only tests
+    sampler: Any = None
 
     def apply_settings(self, settings: Settings) -> None:
         self.store.update_device(brightness=settings.brightness)

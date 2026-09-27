@@ -1,16 +1,18 @@
 import { z } from "zod";
 
-import { color, money, resetIn } from "../lib/format";
+import { accentOf, color, money, resetIn } from "../lib/format";
 import { nowSeconds } from "../lib/useNow";
 import { defineWidget } from "../registry/types";
 import { useTool } from "../store/live";
 import { SparkSvg } from "./Sparkline";
 
 const schema = z.object({
-  variant: z.enum(["cost", "quota"]).default("cost"),
-  tool: z.string().default("Claude Code"),
+  // auto: quota % if the agent reports one, else spend
+  variant: z.enum(["auto", "cost", "quota"]).default("auto"),
+  tool: z.string().default("claude-code").meta({ widget: "agent" }),
   label: z.string().default("CLAUDE · VTX"),
-  accent: z.string().default("orange"),
+  // "auto" = the agent's own colour (agents.toml)
+  accent: z.string().default("auto"),
   cost_alert: z.number().min(0).default(200),   // $ / day -> red hero
   quota_warn: z.number().min(0).max(100).default(75),
   quota_crit: z.number().min(0).max(100).default(80),
@@ -33,12 +35,13 @@ export const AccountCard = defineWidget<P>({
   title: "Account card",
   category: "accounts",
   schema,
-  defaults: { variant: "cost", tool: "Claude Code", label: "CLAUDE · VTX", accent: "orange", cost_alert: 200, quota_warn: 75, quota_crit: 80 },
+  defaults: { variant: "auto", tool: "claude-code", label: "CLAUDE · VTX", accent: "auto", cost_alert: 200, quota_warn: 75, quota_crit: 80 },
   defaultSize: { w: 304, h: 50 },
   minSize: { w: 160, h: 40 },
   Component: ({ item, props }) => {
     const st = useTool(props.tool);
-    const accent = color(props.accent);
+    const accent = props.accent === "auto" ? accentOf(st) : color(props.accent);
+    const variant = props.variant === "auto" ? (st && st.quota_pct !== null ? "quota" : "cost") : props.variant;
     const { w, h } = item;
     const dw = 96, dx = w - 14 - dw, hy = 8, dy = h - 17, subY = h - 21;
 
@@ -49,7 +52,7 @@ export const AccountCard = defineWidget<P>({
     if (!st) {
       hero = <span style={{ color: "var(--text-muted)" }}>—</span>;
       sub = "no data";
-    } else if (props.variant === "cost") {
+    } else if (variant === "cost") {
       const liveN = st.sessions.filter((s) => s.live).length;
       const heroCol = st.cost_usd >= props.cost_alert ? "var(--critical)" : "var(--text)";
       hero = <span style={{ color: heroCol }}>{money(st.cost_usd)}</span>;
@@ -71,7 +74,7 @@ export const AccountCard = defineWidget<P>({
       deco = <Bar x={dx} y={dy + 4} w={dw} h={5} frac={0} col={accent} />;
     }
 
-    const heroTop = st && props.variant !== "cost" && st.quota_pct === null ? hy + 4 : hy;
+    const heroTop = st && variant !== "cost" && st.quota_pct === null ? hy + 4 : hy;
     return (
       <>
         <div className="panel" />

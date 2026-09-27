@@ -20,6 +20,7 @@ class StateStore:
         self._cond = threading.Condition(self._lock)
         self._data: dict[str, Any] = {
             "tools": [],
+            "agents": [],
             "system": None,
             "attention": {"overlay": None},
             "device": {

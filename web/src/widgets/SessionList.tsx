@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ago, fmtTokens, TOOL_ACCENT } from "../lib/format";
+import { ago, fmtTokens } from "../lib/format";
 import { useNow } from "../lib/useNow";
 import { defineWidget } from "../registry/types";
 import { type SessionRow, sortSessions, useTools } from "../store/live";
@@ -9,7 +9,8 @@ const ROW_H = 40, GAP = 4;
 
 const schema = z.object({
   max_rows: z.number().int().min(1).max(12).default(5),
-  tools: z.array(z.string()).default(["Claude Code", "Claude Max", "Codex"]),
+  // agent ids or names to include; empty = every agent
+  tools: z.array(z.string()).default([]).meta({ description: "agent ids or names, comma separated; empty = all" }),
 });
 
 function Row({ row, y, w, now }: { row: SessionRow; y: number; w: number; now: number }) {
@@ -53,13 +54,13 @@ export const SessionList = defineWidget<z.infer<typeof schema>>({
   title: "Session list",
   category: "sessions",
   schema,
-  defaults: { max_rows: 5, tools: ["Claude Code", "Claude Max", "Codex"] },
+  defaults: { max_rows: 5, tools: [] },
   defaultSize: { w: 300, h: 216 },
   minSize: { w: 160, h: ROW_H + GAP },
   Component: ({ item, props }) => {
     const tools = useTools();
     const now = useNow("minute").getTime() / 1000;
-    const rows = sortSessions(tools, TOOL_ACCENT, props.tools);
+    const rows = sortSessions(tools, props.tools);
     const fit = Math.max(1, Math.floor(item.h / (ROW_H + GAP)));
     const maxRows = Math.min(props.max_rows, fit);
     let shown = rows.slice(0, maxRows);

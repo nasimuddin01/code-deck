@@ -2,10 +2,12 @@ import { useMemo } from "react";
 import { z } from "zod";
 
 import { registry } from "../registry";
+import { matchesTool, useAgents, useTools } from "../store/live";
 import { useBuilder, useSelectedItem } from "../store/builder";
 import { SCREEN } from "../types/layout";
 
 interface JsonProp {
+  widget?: string;           // from zod .meta({ widget }) — e.g. "agent"
   type?: string | string[];
   enum?: unknown[];
   minimum?: number;
@@ -14,8 +16,27 @@ interface JsonProp {
   description?: string;
 }
 
+/** Pick one of the registered agents (built-ins + agents.toml + pushed). The
+ * stored value is the agent id; older layouts that stored a display name
+ * still resolve to the right option. */
+function AgentSelect({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) {
+  const agents = useAgents();
+  const tools = useTools();
+  const v = String(value ?? "");
+  const current = tools.find((t) => matchesTool(t, v))?.agent_id ?? agents.find((a) => a.name === v)?.id ?? v;
+  const opts = agents.length ? agents.filter((a) => a.enabled).map((a) => ({ id: a.id, name: a.name }))
+                             : tools.map((t) => ({ id: t.agent_id ?? t.name, name: t.name }));
+  if (current && !opts.some((o) => o.id === current)) opts.push({ id: current, name: `${current} (not running)` });
+  return (
+    <select value={current} onChange={(e) => onChange(e.target.value)}>
+      {opts.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+    </select>
+  );
+}
+
 function Field({ name, spec, value, onChange }: { name: string; spec: JsonProp; value: unknown; onChange: (v: unknown) => void }) {
   const t = Array.isArray(spec.type) ? spec.type[0] : spec.type;
+  if (spec.widget === "agent") return <AgentSelect value={value} onChange={onChange} />;
   if (spec.enum) {
     return (
       <select value={String(value ?? "")} onChange={(e) => onChange(e.target.value)}>
