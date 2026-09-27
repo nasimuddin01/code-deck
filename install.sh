@@ -36,7 +36,7 @@ bold "CODE DECK installer"
 
 bold "[1] prerequisites"
 PY=""
-for c in python3.13 python3.12 python3.11 python3; do
+for c in python3 python3.13 python3.12 python3.11; do
   if command -v "$c" >/dev/null && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then
     PY="$c"; break
   fi
@@ -86,7 +86,8 @@ else
 fi
 WHEEL="$(ls server/dist/*.whl | head -n 1)"
 if command -v pipx >/dev/null; then
-  UV_VENV_CLEAR=1 pipx install --force --python "$PY" "$WHEEL"
+  # PIPX_DEFAULT_PYTHON rather than --python: pipx ignores --python with --force
+  UV_VENV_CLEAR=1 PIPX_DEFAULT_PYTHON="$(command -v "$PY")" pipx install --force "$WHEEL"
 else
   uv tool install --force --python "$PY" "$WHEEL"
 fi
@@ -98,5 +99,12 @@ else
 fi
 ok "installed $("$BIN" version)"
 
+# a running service still points at the files we just replaced: move it to the new build now,
+# before the wizard, so it can never be left serving errors
+if [ "$OS" = Darwin ] && [ -f "$HOME/Library/LaunchAgents/com.codedeck.server.plist" ]; then
+  "$BIN" service install >/dev/null && ok "restarted the background service on the new build"
+fi
+
 bold "[4] setup wizard"
+[ -t 0 ] || YES="--yes"      # no keyboard (run from another tool): accept defaults
 exec "$BIN" init $YES

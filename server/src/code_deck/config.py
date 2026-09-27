@@ -161,6 +161,12 @@ def hook_command() -> str:
     return f'"{sys.executable}" -m code_deck.hooks.attention'
 
 
+def is_dev_checkout() -> bool:
+    """Running from a repo checkout's own venv (server/.venv), not an install.
+    A service installed from here would point at the dev tree."""
+    return (Path(sys.prefix).parent / "pyproject.toml").is_file()
+
+
 def ensure_dirs() -> None:
     for d in (HOME, CACHE_DIR, LOG_DIR):
         d.mkdir(parents=True, exist_ok=True)

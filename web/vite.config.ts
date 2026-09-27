@@ -21,7 +21,14 @@ export default defineConfig(({ mode }) => {
     outDir: "dist",
     sourcemap: false,
     // deterministic device rendering: no code-splitting surprises
-    rollupOptions: { output: { manualChunks: undefined } },
+    rollupOptions: {
+      output: { manualChunks: undefined },
+      // zod ships /* @__PURE__ */ comments rollup can't place; harmless, just noisy
+      onwarn(warning, warn) {
+        if (warning.code === "INVALID_ANNOTATION") return;
+        warn(warning);
+      },
+    },
   },
   test: {
     environment: "node",

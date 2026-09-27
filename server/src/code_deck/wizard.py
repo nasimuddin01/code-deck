@@ -260,6 +260,11 @@ class Wizard:
             self.say(INFO, "Linux: run it with Docker Compose (docker/compose.yml) or `code-deck serve`.")
             return
         from .service import launchd
+        if config.is_dev_checkout() and self.yes:
+            self.say(WARN, "running from a development checkout: not installing the service "
+                           "automatically (it would point at this checkout)")
+            self.notes.append("Install the service from your installed copy: `code-deck service install`.")
+            return
         if self.confirm("Install it so CODE DECK starts at login and restarts on crash?"):
             try:
                 launchd.install()
@@ -326,6 +331,10 @@ def _read_json(path: Path) -> dict | None:
 
 def run(yes: bool = False, env_file: Path | None = None) -> None:
     typer.secho("CODE DECK setup", bold=True)
+    if not yes and not sys.stdin.isatty():
+        # e.g. run from another tool or a `!` prompt: prompts would read EOF and abort
+        typer.echo("No keyboard input available, so every default is accepted (same as --yes).")
+        yes = True
     typer.echo("Gets the TURZX screen, the renderer and Claude Code/Codex wired up. "
                "Every step can be skipped and re-run later.")
     w = Wizard(yes=yes, env_file=env_file or config.USER_ENV_FILE)
