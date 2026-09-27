@@ -64,8 +64,9 @@ class Runtime:
             if player_url is None and static_dir() is None:
                 raise ValueError("web app is not built (no static/index.html); "
                                  "run `pnpm build:server` in web/ or pass --player-url")
-            self.threads.append(DeviceLoop(self.store, self.stop, ChromiumRenderer(url),
-                                           no_device=no_device))
+            self.device_loop = DeviceLoop(self.store, self.stop, ChromiumRenderer(url), no_device=no_device)
+            self.ctx.device_loop = self.device_loop
+            self.threads.append(self.device_loop)
         elif renderer != "none":
             raise ValueError(f"unknown renderer {renderer!r} (pil | chromium | none)")
 

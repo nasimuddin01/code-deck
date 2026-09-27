@@ -34,6 +34,12 @@ class DeviceLoop(threading.Thread):
         self._last: Image.Image | None = None
         self._brightness_applied: int | None = None
         self._force_full = True
+        self._test_until = 0.0          # show_test(): test pattern until this time
+        self._latest: Image.Image | None = None
+
+    def show_test(self, seconds: float = 6.0) -> None:
+        """Show the setup test pattern for a few seconds, then the dashboard."""
+        self._test_until = time.time() + seconds
 
     def _brightness(self) -> int:
         b = self.store.get("device").get("brightness")
@@ -92,6 +98,21 @@ class DeviceLoop(threading.Thread):
                     log.info("connected via libusb: %dx%d", scr.width, scr.height)
 
                 frame = self.renderer.poll(timeout=0.5)
+                if frame is not None:
+                    self._latest = frame
+                testing = time.time() < self._test_until
+                if testing or (self._last is not None and self._last.info.get("test")):
+                    from .test_frame import test_frame
+                    if testing and not (self._last is not None and self._last.info.get("test")):
+                        t = test_frame()
+                        t.info["test"] = True
+                        self._force_full = True
+                        self._push(scr, t)
+                        continue
+                    if testing:
+                        continue
+                    frame = frame or self._latest      # test over: put the dashboard back
+                    self._force_full = True
                 if frame is None:
                     continue
                 if scr is not None:

@@ -33,6 +33,8 @@ class AppContext:
     settings_listeners: list[Callable[[Settings], None]] = field(default_factory=list)
     # the stats sampler (owns the agent registry); None in API-only tests
     sampler: Any = None
+    # the device loop (chromium renderer only), for the setup test pattern
+    device_loop: Any = None
 
     def apply_settings(self, settings: Settings) -> None:
         self.store.update_device(brightness=settings.brightness)
@@ -48,10 +50,30 @@ def static_dir() -> Path | None:
     return p if (p / "index.html").exists() else None
 
 
+def _origin_allowed(origin: str) -> bool:
+    """Browsers send Origin on cross-site requests. Only our own pages (any
+    local port, e.g. the Vite dev server) may change things; scripts and curl
+    send no Origin and are fine."""
+    from urllib.parse import urlparse
+    host = (urlparse(origin).hostname or "").lower()
+    return host in ("127.0.0.1", "localhost", "::1")
+
+
 def create_app(ctx: AppContext) -> FastAPI:
+    from .setup_api import router as setup_router
     app = FastAPI(title="CODE DECK", docs_url="/api/docs", redoc_url=None)
     app.state.ctx = ctx
+
+    @app.middleware("http")
+    async def block_cross_site_writes(request, call_next):
+        # a web page elsewhere must not be able to POST to the local server
+        origin = request.headers.get("origin")
+        if request.method not in ("GET", "HEAD", "OPTIONS") and origin and not _origin_allowed(origin):
+            return PlainTextResponse("cross-site request refused", status_code=403)
+        return await call_next(request)
+
     app.include_router(router)
+    app.include_router(setup_router)
     app.add_api_websocket_route("/ws/state", ws_state)
 
     static = static_dir()
