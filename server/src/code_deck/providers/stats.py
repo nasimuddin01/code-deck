@@ -68,11 +68,33 @@ class DummyStatsProvider:
             out.append(max(0.0, daylight * recency + rng.uniform(-0.25, 0.45)))
         return out
 
+    def _sessions(self, name: str, now: float) -> list[SessionInfo]:
+        # invented example projects: screenshots and demos show every row state
+        if name == "Claude Code":
+            return [
+                SessionInfo(id="a1b2c3d4", label="my-app", model="fable-5.1", cwd="~/code/my-app",
+                            tokens_in=1_420_000, tokens_out=182_000, active=True,
+                            last_active=now - 4, live=True),
+                SessionInfo(id="e5f6a7b8", label="api-server", model="fable-5.1", cwd="~/code/api-server",
+                            tokens_in=610_000, tokens_out=77_000, active=True,
+                            last_active=now - 95, needs_input=True, attention_kind="needs"),
+                SessionInfo(id="c9d0e1f2", label="docs-site", model="sonnet-5", cwd="~/code/docs-site",
+                            tokens_in=240_000, tokens_out=31_000, active=True,
+                            last_active=now - 540),
+            ]
+        if name == "Codex":
+            return [SessionInfo(id="0a1b2c3d", label="codex", model="gpt-5-codex",
+                                tokens_in=880_000, tokens_out=95_000, active=True,
+                                last_active=now - 1260)]
+        return []
+
     def get_stats(self) -> list[ToolStats]:
-        drift = (time.time() - self.t0) / 60.0  # minutes since start
+        now = time.time()
+        drift = (now - self.t0) / 60.0  # minutes since start
         result = []
         for i, (name, b) in enumerate(self.base.items()):
             wobble = 1 + 0.002 * drift + self.rng.uniform(-0.001, 0.001)
+            sessions = self._sessions(name, now)
             result.append(ToolStats(
                 name=name,
                 model=self.models[name],
@@ -82,5 +104,12 @@ class DummyStatsProvider:
                 cost_usd=b["cost"] * wobble,
                 activity_24h=self._activity(seed=i * 1000),
                 live=False,
+                active=any(x.live for x in sessions),
+                quota_pct=42.0 if name == "Codex" else None,
+                quota_resets_at=now + 3 * 86400 if name == "Codex" else None,
+                sessions=sessions,
             ))
+        result.insert(1, ToolStats(
+            name="Claude Max", model="", sessions_today=0, tokens_in=0, tokens_out=0,
+            cost_usd=0.0, live=False, quota_pct=63.0, quota_resets_at=now + 2 * 86400))
         return result
