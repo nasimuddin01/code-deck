@@ -147,4 +147,4 @@ def _ensure_builtins() -> None:
     if _builtins_done:
         return
     _builtins_done = True
-    from . import builtin, push  # noqa: F401  (each module registers its source types)
+    from . import builtin, command, push  # noqa: F401  (each module registers its source types)
