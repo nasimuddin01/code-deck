@@ -63,9 +63,25 @@ thread in `state/sampler.py` calls them and publishes into the `StateStore`.
 Add a section to the snapshot, mirror the type in `web/src/types/state.ts`
 (snake_case, same names), and expose a selector hook.
 
+## Adding a setting
+
+Settings are `CODE_DECK_*` variables. Add the entry to `ENV_SPEC` in
+`server/src/code_deck/config.py`, read it there with `_env()` /
+`_env_int()` / `_env_path()`, then regenerate the template:
+
+```sh
+cd server && uv run code-deck env example > ../.env.example
+```
+
+A test fails if `.env.example` drifts from `ENV_SPEC`. The setup wizard
+(`code-deck init`, in `wizard.py`) writes the same format to
+`~/.config/code-deck/.env`.
+
 ## Ground rules
 
 - Never commit the vendor's Windows software or anything from `turzx-win/`.
+- Never commit a `.env`, personal paths, real usage numbers or screenshots of
+  real sessions. Use `--mock` data for screenshots and examples.
 - Never store or log credentials, tokens, or environment variable values. The
   CLI prints the Claude Code snippets for the user to paste; it does not
   write `~/.claude/settings.json`.
