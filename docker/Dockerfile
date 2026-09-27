@@ -33,4 +33,5 @@ RUN pip install --no-cache-dir /tmp/*.whl && rm /tmp/*.whl \
 VOLUME ["/data"]
 EXPOSE 8765 4318
 HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8765/api/health')" || exit 1
-CMD ["code-deck", "serve", "--host", "0.0.0.0"]
+ENV CODE_DECK_HOST=0.0.0.0
+CMD ["code-deck", "serve"]

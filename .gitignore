@@ -32,3 +32,8 @@ menubar/dist/
 
 # generated icons (menubar/icon/make.sh)
 menubar/icon/out/
+
+# local configuration (see .env.example); never commit
+.env
+.env.*
+!.env.example

@@ -40,9 +40,13 @@ def plist_dict(extra_args: list[str] | None = None) -> dict:
         if p not in path.split(":"):
             path = f"{path}:{p}" if path else p
     env = {"PATH": path, "HOME": str(Path.home())}
-    for k in ("CODE_DECK_HOME", "CODE_DECK_PORT", "CODE_DECK_LIBUSB"):
-        if os.environ.get(k):
-            env[k] = os.environ[k]
+    # Values from a .env are NOT baked in: the service re-reads
+    # ~/.config/code-deck/.env at start, so edits apply on restart. Only keys
+    # explicitly exported in the installing shell are pinned.
+    from ..config import ENV_PREFIX, FROM_FILES
+    for k, v in os.environ.items():
+        if k.startswith(ENV_PREFIX) and k not in FROM_FILES and k != "CODE_DECK_ENV_FILE" and v:
+            env[k] = v
     return {
         "Label": LAUNCHD_LABEL,
         "ProgramArguments": [sys.executable, "-m", "code_deck", "serve", *(extra_args or [])],

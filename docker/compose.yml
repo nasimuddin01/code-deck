@@ -1,10 +1,16 @@
 # Linux / Raspberry Pi. Not for macOS: Docker Desktop cannot pass USB devices
 # through, and the Codex app-server is a macOS binary — use `pipx` + launchd there.
 #
-#   docker compose -f docker/compose.yml up -d --build
-#   open http://localhost:8765            # builder
+#   cp .env.example .env                 # optional; defaults work as-is
+#   docker compose --env-file .env -f docker/compose.yml up -d --build
+#   open http://localhost:8765           # builder
 #
-# Claude Code on the host must point telemetry at 127.0.0.1:4318 (see
+# Settings come from the repo's .env (CODE_DECK_* keys). The host-side ports
+# follow CODE_DECK_PORT / CODE_DECK_OTLP_PORT; inside the container the server
+# always listens on 8765/4318 and the paths below are fixed, so those keys are
+# overridden in `environment:`.
+#
+# Claude Code on the host must point telemetry at the published OTLP port (see
 # `code-deck env print`) and run the attention hook; the hook writes flags into
 # ~/.claude/code-deck, which is mounted read-write below.
 services:
@@ -17,17 +23,25 @@ services:
     devices:
       - /dev/bus/usb:/dev/bus/usb           # TURZX 1a86:5722
     ports:
-      - "127.0.0.1:8765:8765"               # builder / API / player
-      - "127.0.0.1:4318:4318"               # OTLP receiver for Claude Code cost
+      - "127.0.0.1:${CODE_DECK_PORT:-8765}:8765"        # builder / API / player
+      - "127.0.0.1:${CODE_DECK_OTLP_PORT:-4318}:4318"   # OTLP receiver for Claude Code cost
     volumes:
-      - ${HOME}/.claude/projects:/root/.claude/projects:ro
-      - ${HOME}/.claude/code-deck:/root/.claude/code-deck   # attention flags + otel day state (rw)
-      - ${HOME}/.codex:/root/.codex:ro
+      - ${CODE_DECK_CLAUDE_DIR:-${HOME}/.claude}/projects:/root/.claude/projects:ro
+      - ${CODE_DECK_CLAUDE_DIR:-${HOME}/.claude}/code-deck:/root/.claude/code-deck   # attention flags + otel day state (rw)
+      - ${CODE_DECK_CODEX_DIR:-${HOME}/.codex}:/root/.codex:ro
       - code-deck-data:/data                # layout.json, caches, preview.png
     shm_size: 512m                          # headless Chromium
-    environment:
+    env_file:
+      - path: ../.env
+        required: false
+    environment:                            # container-internal, wins over .env
       CODE_DECK_HOME: /data
+      CODE_DECK_HOST: 0.0.0.0
+      CODE_DECK_PORT: "8765"
       CODE_DECK_OTLP_HOST: 0.0.0.0
+      CODE_DECK_OTLP_PORT: "4318"
+      CODE_DECK_CLAUDE_DIR: /root/.claude
+      CODE_DECK_CODEX_DIR: /root/.codex
 
 volumes:
   code-deck-data:

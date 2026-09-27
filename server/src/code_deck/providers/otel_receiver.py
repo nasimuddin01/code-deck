@@ -24,10 +24,12 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-DEFAULT_PORT = 4318
+from .. import config
+
+DEFAULT_PORT = config.OTLP_PORT
 # survive runner restarts: without this, every restart wiped the day's
 # accumulated cost and the $ hero visibly "reset" mid-day
-STATE_PATH = os.path.expanduser("~/.claude/code-deck/otel_state.json")
+STATE_PATH = str(config.OTEL_STATE_PATH)
 
 
 def _dp_value(dp: dict) -> float:
@@ -166,7 +168,7 @@ class OtelReceiver:
 
         # loopback by default; Docker sets CODE_DECK_OTLP_HOST=0.0.0.0 so the
         # published port reaches the receiver
-        host = os.environ.get("CODE_DECK_OTLP_HOST", "127.0.0.1")
+        host = config.OTLP_HOST
         self._srv = ThreadingHTTPServer((host, self.port), Handler)
         t = threading.Thread(target=self._srv.serve_forever, daemon=True)
         t.start()

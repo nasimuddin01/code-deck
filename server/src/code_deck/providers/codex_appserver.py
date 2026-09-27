@@ -24,12 +24,10 @@ import select
 import subprocess
 import threading
 import time
-from pathlib import Path
 
-HOME = Path.home()
-_BIN_CANDIDATES = [
-    HOME / ".codex" / "plugins" / ".plugin-appserver" / "codex",
-]
+from .. import config
+
+_BIN_CANDIDATES = [config.CODEX_APPSERVER_BIN]
 
 
 def _find_bin() -> str | None:
@@ -37,7 +35,7 @@ def _find_bin() -> str | None:
         if c.exists() and os.access(c, os.X_OK):
             return str(c)
     # fallback: any */codex under the plugin appserver dir
-    for p in glob.glob(str(HOME / ".codex" / "plugins" / "*" / "codex")):
+    for p in glob.glob(str(config.CODEX_DIR / "plugins" / "*" / "codex")):
         if os.access(p, os.X_OK):
             return p
     return None

@@ -11,7 +11,32 @@ import Cocoa
 import UserNotifications
 import WebKit
 
-let serverURL = URL(string: ProcessInfo.processInfo.environment["CODE_DECK_URL"] ?? "http://127.0.0.1:8765")!
+/// CODE_DECK_* settings: the real environment first, then the same
+/// ~/.config/code-deck/.env the server reads (launchd gives us no shell env).
+func deckSetting(_ key: String) -> String? {
+    if let v = ProcessInfo.processInfo.environment[key], !v.isEmpty { return v }
+    let path = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".config/code-deck/.env").path
+    guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
+    for raw in text.split(separator: "\n") {
+        var line = raw.trimmingCharacters(in: .whitespaces)
+        if line.hasPrefix("#") || !line.contains("=") { continue }
+        if line.hasPrefix("export ") { line = String(line.dropFirst(7)) }
+        let parts = line.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+        guard parts.count == 2, parts[0] == key else { continue }
+        var v = parts[1]
+        if v.count >= 2, let f = v.first, f == v.last, f == "\"" || f == "'" { v = String(v.dropFirst().dropLast()) }
+        else if let r = v.range(of: " #") { v = String(v[..<r.lowerBound]).trimmingCharacters(in: .whitespaces) }
+        return v.isEmpty ? nil : v
+    }
+    return nil
+}
+
+let serverURL: URL = {
+    if let u = deckSetting("CODE_DECK_URL"), let url = URL(string: u) { return url }
+    let port = deckSetting("CODE_DECK_PORT") ?? "8765"
+    return URL(string: "http://127.0.0.1:\(port)")!
+}()
 let launchAgentLabel = "com.codedeck.menubar"
 let attention = NSColor(srgbRed: 0x4a / 255, green: 0xa3 / 255, blue: 0xff / 255, alpha: 1)
 let muted = NSColor.secondaryLabelColor

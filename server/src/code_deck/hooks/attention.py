@@ -9,7 +9,7 @@ reads to draw a blue "needs input" dot:
   UserPromptSubmit  -> the user just responded                     -> clear flag
   SessionEnd        -> the session closed                          -> clear flag
 
-Flags live in ~/.claude/code-deck/attention/<session_id>.json. Pure stdlib,
+Flags live in <CODE_DECK_CLAUDE_DIR, default ~/.claude>/code-deck/attention/<session_id>.json. Pure stdlib,
 never blocks, always exits 0 — a hook failure must never disrupt a session.
 """
 import json
@@ -17,7 +17,9 @@ import os
 import sys
 import time
 
-FLAG_DIR = os.path.expanduser("~/.claude/code-deck/attention")
+from code_deck.config import ATTENTION_DIR
+
+FLAG_DIR = str(ATTENTION_DIR)
 
 
 def main() -> None:

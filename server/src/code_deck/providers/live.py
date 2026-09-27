@@ -20,15 +20,15 @@ import subprocess
 import time
 from pathlib import Path
 
+from .. import config
 from .codex_appserver import CodexAppServer
 from .otel_receiver import OtelReceiver
 from .stats import SessionInfo, ToolStats
 
-HOME = Path.home()
-CLAUDE_PROJECTS = HOME / ".claude" / "projects"
-CODEX_SESSIONS = HOME / ".codex" / "sessions"
-CODEX_LOCKS = HOME / ".codex" / "thread-writer-locks"
-ATTENTION_DIR = HOME / ".claude" / "code-deck" / "attention"
+CLAUDE_PROJECTS = config.CLAUDE_PROJECTS
+CODEX_SESSIONS = config.CODEX_DIR / "sessions"
+CODEX_LOCKS = config.CODEX_DIR / "thread-writer-locks"
+ATTENTION_DIR = config.ATTENTION_DIR
 
 ACTIVE_WINDOW = 20 * 60    # seconds; only sessions written this recently appear in the list
 LIVE_WINDOW = 120          # seconds; written this recently => agent working NOW (green dot)
