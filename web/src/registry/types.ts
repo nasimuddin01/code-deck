@@ -3,7 +3,7 @@ import type { z } from "zod";
 
 import type { LayoutItem } from "../types/layout";
 
-export type WidgetCategory = "accounts" | "sessions" | "system" | "time" | "primitives" | "overlay";
+export type WidgetCategory = "accounts" | "sessions" | "system" | "time" | "media" | "primitives" | "overlay";
 
 /** How the component library grows: one WidgetDef per widget, registered in
  * registry/index.ts. The builder derives its palette and props panel from

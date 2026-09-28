@@ -36,11 +36,16 @@ screen next to your keyboard, so you can see at a glance:
 - **Any other agent you use.** Add your own coding agents or harnesses next to
   the built-ins, fed by hooks, a script, log files, OpenTelemetry or a plugin.
 - **Anything else you add.** CPU, memory, disk and network tiles, clocks, text
-  and dividers. Every element is a widget you can move, resize or remove.
+  and dividers, the local weather, and family photos as a single picture or a
+  slideshow. Every element is a widget you can move, resize or remove.
 
 It runs locally and reads only files already on your machine: Claude Code's
 transcripts, Codex's session files, and telemetry Claude Code sends to
-`127.0.0.1`. Nothing is uploaded anywhere.
+`127.0.0.1`. Nothing is uploaded anywhere. The one exception is the optional
+weather widget, which sends only the city or coordinates you give it to
+[Open-Meteo](https://open-meteo.com) (free, no account). Photos you upload in
+the builder stay in `~/.config/code-deck/media/`; each is shrunk to screen
+size and its metadata, GPS location included, is removed.
 
 ## The hardware: TURZX 3.5" smart screen
 

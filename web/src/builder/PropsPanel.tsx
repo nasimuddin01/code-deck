@@ -5,6 +5,7 @@ import { registry } from "../registry";
 import { matchesTool, useAgents, useTools } from "../store/live";
 import { useBuilder, useSelectedItem } from "../store/builder";
 import { SCREEN } from "../types/layout";
+import { AlbumField, PhotoField } from "./MediaFields";
 
 interface JsonProp {
   widget?: string;           // from zod .meta({ widget }) — e.g. "agent"
@@ -37,6 +38,8 @@ function AgentSelect({ value, onChange }: { value: unknown; onChange: (v: unknow
 function Field({ name, spec, value, onChange }: { name: string; spec: JsonProp; value: unknown; onChange: (v: unknown) => void }) {
   const t = Array.isArray(spec.type) ? spec.type[0] : spec.type;
   if (spec.widget === "agent") return <AgentSelect value={value} onChange={onChange} />;
+  if (spec.widget === "album") return <AlbumField value={value} onChange={onChange} />;
+  if (spec.widget === "photo") return <PhotoField value={value} onChange={onChange} />;
   if (spec.enum) {
     return (
       <select value={String(value ?? "")} onChange={(e) => onChange(e.target.value)}>
@@ -141,12 +144,16 @@ export function PropsPanel() {
       <label className="check"><input type="checkbox" checked={item.hidden} onChange={(e) => updateItem(item.id, { hidden: e.target.checked })} /> hidden</label>
 
       {fields.length > 0 && <div className="pane-title">Props</div>}
-      {fields.map(([name, spec]) => (
-        <label key={name} className="field">
-          <span title={spec.description}>{name.replace(/_/g, " ")}</span>
-          <Field name={name} spec={spec} value={props[name]} onChange={(v) => updateProps(item.id, { [name]: v })} />
-        </label>
-      ))}
+      {fields.map(([name, spec]) => {
+        // upload controls hold several buttons: a <label> would steal their clicks
+        const Wrap = spec.widget === "album" || spec.widget === "photo" ? "div" : "label";
+        return (
+          <Wrap key={name} className="field">
+            <span title={spec.description}>{name.replace(/_/g, " ")}</span>
+            <Field name={name} spec={spec} value={props[name]} onChange={(v) => updateProps(item.id, { [name]: v })} />
+          </Wrap>
+        );
+      })}
     </aside>
   );
 }

@@ -60,6 +60,7 @@ def _origin_allowed(origin: str) -> bool:
 
 
 def create_app(ctx: AppContext) -> FastAPI:
+    from .media import router as media_router
     from .setup_api import router as setup_router
     app = FastAPI(title="CODE DECK", docs_url="/api/docs", redoc_url=None)
     app.state.ctx = ctx
@@ -74,6 +75,7 @@ def create_app(ctx: AppContext) -> FastAPI:
 
     app.include_router(router)
     app.include_router(setup_router)
+    app.include_router(media_router)
     app.add_api_websocket_route("/ws/state", ws_state)
 
     static = static_dir()
