@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 
+import { MEDIA_CHANGED } from "../api";
 import { bumpDirty } from "../lib/dirty";
 import { mediaUrl, usePolledJson } from "../lib/usePolledJson";
 import { defineWidget } from "../registry/types";
@@ -44,13 +45,15 @@ export const Slideshow = defineWidget<P>({
     const fromAlbum = props.source === "album";
     const where = (fromAlbum ? props.album : props.folder).trim();
     const list = usePolledJson<{ files: string[] }>(
-      where ? `/api/media/list?${new URLSearchParams(fromAlbum ? { album: where } : { dir: where })}` : null, RESCAN_MS);
+      where ? `/api/media/list?${new URLSearchParams(fromAlbum ? { album: where } : { dir: where })}` : null,
+      RESCAN_MS, MEDIA_CHANGED);
     const files = list.data?.files ?? [];
     const n = files.length;
     const [idx, setIdx] = useState(0);
     // what is on screen; only swapped once the next photo has fully loaded,
     // so the device never gets a half-drawn frame
-    const [shown, setShown] = useState<string>("");
+    const [shown, setShown] = useState<{ url: string; path: string } | null>(null);
+    const failures = useRef(0);   // consecutive photos that failed to load
 
     useEffect(() => {
       if (!n) return;
@@ -60,22 +63,26 @@ export const Slideshow = defineWidget<P>({
       return () => window.clearInterval(t);
     }, [n, props.interval_minutes, props.order]);
 
-    const want = n ? mediaUrl(files[idx % n], item.w, item.h) : "";
+    const path = n ? files[idx % n] : "";
+    const want = path ? mediaUrl(path, item.w, item.h) : "";
     useEffect(() => {
-      if (!want) { setShown(""); bumpDirty(); return; }
+      if (!want) { setShown(null); bumpDirty(); return; }
       let cancelled = false;
       const img = new Image();
-      img.onload = () => { if (!cancelled) setShown(want); };
-      img.onerror = () => { if (!cancelled && n > 1) setIdx((i) => nextIndex(i, n, "sequential")); };
+      img.onload = () => { if (!cancelled) { failures.current = 0; setShown({ url: want, path }); } };
+      img.onerror = () => {
+        // skip a broken photo, but stop once every photo in the list has failed
+        if (!cancelled && ++failures.current < n) setIdx((i) => nextIndex(i, n, "sequential"));
+      };
       img.src = want;
       return () => { cancelled = true; };
-    }, [want, n]);
+    }, [want, path, n]);
 
     if (!where) return <MediaNote text={fromAlbum ? "Name an album in the inspector" : "Set a photo folder in the inspector, e.g. ~/Pictures/family"} />;
     if (list.error && !n) return <MediaNote text={`Can't open ${where}: ${list.error}`} />;
     if (list.data && !n) return <MediaNote text={fromAlbum ? `Album "${where}" is empty. Upload photos in the inspector.` : `No JPEG/PNG photos in ${where}`} />;
-    if (!shown) return <MediaNote text="Loading photos…" />;
-    const name = props.show_name ? prettyName(new URL(shown, location.href).searchParams.get("path") ?? "") : "";
-    return <MediaImage src={shown} fit={props.fit} radius={props.radius} caption={name} />;
+    if (!shown) return <MediaNote text={failures.current >= n ? "None of these photos can be shown (HEIC? export as JPEG)" : "Loading photos…"} />;
+    return <MediaImage src={shown.url} fit={props.fit} radius={props.radius}
+                       caption={props.show_name ? prettyName(shown.path) : ""} />;
   },
 });

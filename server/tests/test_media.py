@@ -56,6 +56,40 @@ def test_file_is_downsized_and_upright(client):
     assert out.width >= 600 and out.height >= 300 and out.width < 1000   # covers the box, no bigger
 
 
+def test_file_revalidates_instead_of_caching_for_an_hour(client):
+    src = client.home / "pics" / "same-name.jpg"
+    Image.new("RGB", (50, 50), (255, 0, 0)).save(src)
+    r1 = client.get("/api/media/file", params={"path": str(src)})
+    assert r1.headers["cache-control"] == "no-cache" and r1.headers["etag"]
+    assert client.get("/api/media/file", params={"path": str(src)},
+                      headers={"if-none-match": r1.headers["etag"]}).status_code == 304
+    # replaced under the same name -> new etag, new bytes
+    import os
+    import time
+    Image.new("RGB", (50, 50), (0, 0, 255)).save(src)
+    os.utime(src, ns=(time.time_ns(), time.time_ns() + 5_000_000_000))
+    r2 = client.get("/api/media/file", params={"path": str(src)}, headers={"if-none-match": r1.headers["etag"]})
+    assert r2.status_code == 200 and r2.headers["etag"] != r1.headers["etag"]
+
+
+def test_thumb_concurrent_same_key(client):
+    """Many threads asking for the same uncached thumbnail must all succeed."""
+    from concurrent.futures import ThreadPoolExecutor
+    src = client.home / "pics" / "race.jpg"
+    Image.new("RGB", (2000, 1500)).save(src)
+    with ThreadPoolExecutor(8) as ex:
+        codes = list(ex.map(lambda _: client.get("/api/media/file", params={"path": str(src), "w": 300, "h": 300}).status_code,
+                            range(16)))
+    assert codes == [200] * 16
+    assert not [f for f in media.media_cache_dir().iterdir() if f.suffix == ".tmp"]
+
+
+def test_heic_gets_the_export_hint(client):
+    (client.home / "pics" / "IMG_1.HEIC").write_bytes(b"\x00" * 10)
+    r = client.get("/api/media/file", params={"path": "~/pics/IMG_1.HEIC"})
+    assert r.status_code == 415 and "JPEG" in r.json()["detail"]
+
+
 def test_non_image_rejected(client):
     (client.home / "pics" / "a.txt").write_text("hi")
     assert client.get("/api/media/file", params={"path": "~/pics/a.txt"}).status_code == 404
@@ -98,6 +132,7 @@ def test_upload_list_serve_delete(client):
 def test_upload_rejects_bad_input(client):
     assert client.post("/api/media/albums/family", content=b"not an image").status_code == 415
     assert client.post("/api/media/albums/family", content=b"").status_code == 400
+    assert client.post("/api/media/albums/family", content=_jpeg(10, 10), headers={"content-length": "abc"}).status_code == 400
     assert client.post("/api/media/albums/..%2Fescape", content=_jpeg(10, 10)).status_code // 100 == 4
     assert client.post("/api/media/albums/fam!ly", content=_jpeg(10, 10)).status_code == 400
     assert client.get("/api/media/list", params={"album": "empty"}).json()["files"] == []

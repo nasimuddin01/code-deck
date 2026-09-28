@@ -19,7 +19,9 @@ import hashlib
 import io
 import json
 import logging
+import os
 import re
+import tempfile
 import threading
 import time
 import urllib.parse
@@ -28,7 +30,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from .. import config
 
@@ -36,6 +38,8 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
+UNSUPPORTED_EXTS = {".heic", ".heif"}   # iPhone default; Pillow can't read it without pillow-heif
+UNSUPPORTED_HINT = "cannot read this image (HEIC? export it as JPEG)"
 MAX_LIST = 2000
 MAX_EDGE = 1280           # never serve (or store) more than this
 MAX_UPLOAD_BYTES = 40 * 1024 * 1024
@@ -79,6 +83,23 @@ def _is_image(p: Path) -> bool:
     return p.suffix.lower() in IMAGE_EXTS and not p.name.startswith(".")
 
 
+def _save_jpeg(im, out: Path) -> None:
+    """Write `out` atomically. The temp file gets a unique name, so two
+    requests producing the same file at once can't corrupt each other."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=out.parent, prefix=".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            im.save(f, "JPEG", quality=90)          # no exif= -> metadata dropped
+        os.replace(tmp, out)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 @router.get("/media/list")
 def media_list(dir: str = Query("", max_length=1024), album: str = Query("", max_length=40)) -> dict:
     """Image files directly inside `dir` (or uploaded `album`), sorted by name."""
@@ -94,16 +115,16 @@ def media_list(dir: str = Query("", max_length=1024), album: str = Query("", max
     return {"dir": str(d), "files": [str(f) for f in files[:MAX_LIST]]}
 
 
-def _thumb(src: Path, w: int, h: int) -> Path:
-    """A JPEG at least w x h (aspect kept, so object-fit cover still works)."""
+def _thumb(src: Path, w: int, h: int) -> tuple[Path, str]:
+    """A JPEG at least w x h (aspect kept, so object-fit cover still works),
+    and its cache key, which changes whenever the source file does."""
     from PIL import Image, ImageOps
 
     st = src.stat()
     key = hashlib.sha1(f"{src}|{st.st_mtime_ns}|{st.st_size}|{w}x{h}".encode()).hexdigest()
     out = media_cache_dir() / f"{key}.jpg"
     if out.exists():
-        return out
-    out.parent.mkdir(parents=True, exist_ok=True)
+        return out, key
     with Image.open(src) as im:
         im.seek(0)                                  # first frame of a GIF
         im = ImageOps.exif_transpose(im)            # phone photos: upright
@@ -111,25 +132,30 @@ def _thumb(src: Path, w: int, h: int) -> Path:
         if scale < 1.0:
             im = im.resize((max(1, round(im.width * scale)), max(1, round(im.height * scale))),
                            Image.Resampling.LANCZOS)
-        tmp = out.with_suffix(".tmp")
-        im.convert("RGB").save(tmp, "JPEG", quality=90)
-        tmp.replace(out)
-    return out
+        _save_jpeg(im.convert("RGB"), out)
+    return out, key
 
 
 @router.get("/media/file")
-def media_file(path: str = Query(..., max_length=1024),
+def media_file(request: Request, path: str = Query(..., max_length=1024),
                w: int = Query(640, ge=16, le=MAX_EDGE),
-               h: int = Query(640, ge=16, le=MAX_EDGE)) -> FileResponse:
+               h: int = Query(640, ge=16, le=MAX_EDGE)) -> Response:
     p = _resolve(path)
+    if p.is_file() and p.suffix.lower() in UNSUPPORTED_EXTS:
+        raise HTTPException(415, UNSUPPORTED_HINT)
     if not p.is_file() or not _is_image(p):
         raise HTTPException(404, "image not found")
     try:
-        out = _thumb(p, w, h)
+        out, key = _thumb(p, w, h)
     except Exception as e:
         log.warning("cannot read image %s: %s", p, e)
-        raise HTTPException(415, "cannot read this image (HEIC? export it as JPEG)") from e
-    return FileResponse(out, media_type="image/jpeg", headers={"Cache-Control": "max-age=3600"})
+        raise HTTPException(415, UNSUPPORTED_HINT) from e
+    # the URL doesn't change when the file does, so let the browser revalidate:
+    # an unchanged photo costs a 304, a replaced one shows up at once
+    etag = f'"{key}"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "no-cache"})
+    return FileResponse(out, media_type="image/jpeg", headers={"ETag": etag, "Cache-Control": "no-cache"})
 
 
 # -- uploads ------------------------------------------------------------------
@@ -146,11 +172,8 @@ def _store_upload(album_dir: Path, name: str, data: bytes) -> Path:
         raise HTTPException(415, "not an image this server can read (HEIC? export it as JPEG)") from e
     stem = re.sub(r"[^A-Za-z0-9 _-]+", "", Path(name).stem).strip()[:60] or "photo"
     tag = hashlib.sha1(data).hexdigest()[:8]            # same photo twice = same file
-    album_dir.mkdir(parents=True, exist_ok=True)
     out = album_dir / f"{stem}-{tag}.jpg"
-    tmp = out.with_suffix(".tmp")
-    im.save(tmp, "JPEG", quality=90)                    # no exif= -> metadata dropped
-    tmp.replace(out)
+    _save_jpeg(im, out)
     return out
 
 
@@ -158,7 +181,11 @@ def _store_upload(album_dir: Path, name: str, data: bytes) -> Path:
 async def upload_photo(request: Request, album: str, name: str = Query("photo.jpg", max_length=200)) -> dict:
     """Body = the raw image bytes (one file per request)."""
     d = _album_dir(album)
-    if int(request.headers.get("content-length") or 0) > MAX_UPLOAD_BYTES:
+    try:
+        declared = int(request.headers.get("content-length") or 0)
+    except ValueError:
+        raise HTTPException(400, "bad Content-Length") from None
+    if declared > MAX_UPLOAD_BYTES:
         raise HTTPException(413, "photo too large (40 MB max)")
     data = await request.body()
     if not data:

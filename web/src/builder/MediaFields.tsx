@@ -52,16 +52,22 @@ export function AlbumField({ value, onChange }: { value: unknown; onChange: (v: 
   const [over, setOver] = useState(false);
   const valid = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,39}$/.test(album);
 
-  const refresh = useCallback(() => {
-    listAlbums().then((r) => setAlbums(r.albums.map((a) => a.name))).catch(() => {});
-    if (valid) listAlbum(album).then((r) => setFiles(r.files)).catch(() => setFiles([]));
-    else setFiles([]);
-  }, [album, valid]);
+  // the album list only changes on upload/delete; the files of one album
+  // also when the name in the box changes
   useEffect(() => {
-    refresh();
-    window.addEventListener(MEDIA_CHANGED, refresh);
-    return () => window.removeEventListener(MEDIA_CHANGED, refresh);
-  }, [refresh]);
+    const load = () => listAlbums().then((r) => setAlbums(r.albums.map((a) => a.name))).catch(() => {});
+    load();
+    window.addEventListener(MEDIA_CHANGED, load);
+    return () => window.removeEventListener(MEDIA_CHANGED, load);
+  }, []);
+  useEffect(() => {
+    if (!valid) { setFiles([]); return; }
+    let stale = false;
+    const load = () => listAlbum(album).then((r) => { if (!stale) setFiles(r.files); }).catch(() => { if (!stale) setFiles([]); });
+    load();
+    window.addEventListener(MEDIA_CHANGED, load);
+    return () => { stale = true; window.removeEventListener(MEDIA_CHANGED, load); };
+  }, [album, valid]);
 
   const { upload, status, busy } = useUploader(valid ? album : "");
 

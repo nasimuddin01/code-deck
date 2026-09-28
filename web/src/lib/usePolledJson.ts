@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-import { MEDIA_CHANGED } from "../api";
 import { bumpDirty } from "./dirty";
 
 export interface Polled<T> {
@@ -10,8 +9,9 @@ export interface Polled<T> {
 
 /** GET `url` now and every `periodMs`, re-rendering (and marking the frame
  * dirty) only when the response changes. `url` null = idle. Errors keep the
- * last good data so a flaky network never blanks a widget. */
-export function usePolledJson<T>(url: string | null, periodMs: number): Polled<T> {
+ * last good data so a flaky network never blanks a widget. A window event
+ * named `refreshOn` reloads at once (the builder fires one after an upload). */
+export function usePolledJson<T>(url: string | null, periodMs: number, refreshOn?: string): Polled<T> {
   const [state, setState] = useState<Polled<T>>({ data: null, error: null });
   useEffect(() => {
     if (!url) {
@@ -22,7 +22,9 @@ export function usePolledJson<T>(url: string | null, periodMs: number): Polled<T
     let cancelled = false;
     let last = "";
     let timer: number;
+    let gen = 0;   // only the newest load() schedules the next one
     const load = async () => {
+      const my = ++gen;
       try {
         const res = await fetch(url);
         const text = await res.text();
@@ -42,24 +44,25 @@ export function usePolledJson<T>(url: string | null, periodMs: number): Polled<T
           bumpDirty();
         }
       }
-      if (!cancelled) timer = window.setTimeout(load, periodMs);
+      if (!cancelled && my === gen) timer = window.setTimeout(load, periodMs);
     };
-    // an upload/delete in the builder: reload now instead of at the next poll
     const now = () => { window.clearTimeout(timer); load(); };
-    window.addEventListener(MEDIA_CHANGED, now);
+    if (refreshOn) window.addEventListener(refreshOn, now);
     load();
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
-      window.removeEventListener(MEDIA_CHANGED, now);
+      if (refreshOn) window.removeEventListener(refreshOn, now);
     };
-  }, [url, periodMs]);
+  }, [url, periodMs, refreshOn]);
   return state;
 }
 
 /** Server-resized copy of a local photo, big enough for a w x h box. */
 export function mediaUrl(path: string, w: number, h: number): string {
-  // 2x so it stays crisp in the zoomed builder; the device renders at 1x
-  const cap = (n: number) => Math.max(16, Math.min(1280, Math.round(n * 2)));
+  // 2x so it stays crisp in the zoomed builder; the device renders at 1x.
+  // Rounded up to 64 px steps so a resize drag reuses a handful of server
+  // thumbnails instead of making one per pixel.
+  const cap = (n: number) => Math.max(64, Math.min(1280, Math.ceil((n * 2) / 64) * 64));
   return `/api/media/file?${new URLSearchParams({ path, w: String(cap(w)), h: String(cap(h)) })}`;
 }
